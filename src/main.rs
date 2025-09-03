@@ -1,0 +1,61 @@
+use clap::Parser;
+use std::path::Path;
+use std::process;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
+use ccr::build;
+
+#[derive(Parser)]
+#[command(name = "CCR")]
+#[command(about = "C compiler written in Rust", long_about = None)]
+struct Args {
+    #[arg(help = "Absolute or relative path to C source file e.g. ./examples/test.c)")]
+    path: String,
+
+    #[arg(long, help = "Runs the lexer, but stop before parsing")]
+    lex: bool,
+
+    #[arg(
+        long,
+        help = "Runs the lexer and parser, but stop before assembly generation"
+    )]
+    parse: bool,
+
+    #[arg(
+        long = "code-gen",
+        help = "Perform lexing, parsing and assembly generation but stop before code emission"
+    )]
+    codegen: bool,
+}
+
+fn main() {
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::INFO)
+        .finish();
+
+    if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
+        eprintln!("Failed to initialize tracing: {}", e);
+        process::exit(1);
+    }
+
+    let args = Args::parse();
+    let path = Path::new(&args.path);
+
+    if !path.exists() || !path.is_file() {
+        eprintln!("File not found: {}", args.path);
+        process::exit(1);
+    }
+    
+    let stop_after = if args.lex {
+        Some(ccr::CompileStep::Lex)
+    } else if args.parse {
+        Some(ccr::CompileStep::Parse)
+    } else if args.codegen {
+        Some(ccr::CompileStep::CodeGen)
+    } else {
+        None
+    };
+
+    build(path, stop_after);
+    process::exit(0);
+}
