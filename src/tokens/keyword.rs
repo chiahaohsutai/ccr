@@ -1,0 +1,22 @@
+use std::process;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Keyword {
+    INT,
+    VOID,
+    RETURN,
+}
+
+impl From<&str> for Keyword {
+    fn from(s: &str) -> Self {
+        match s {
+            "int" => Keyword::INT,
+            "void" => Keyword::VOID,
+            "return" => Keyword::RETURN,
+            _ => {
+                eprintln!("Unknown keyword: {}", s);
+                process::exit(1);
+            },
+        }
+    }
+}
