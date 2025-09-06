@@ -1,30 +1,23 @@
+use ccr::{build, exit};
 use clap::Parser;
 use std::path::Path;
-use std::process;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
-use ccr::build;
 
 #[derive(Parser)]
 #[command(name = "CCR")]
 #[command(about = "C compiler written in Rust", long_about = None)]
 struct Args {
-    #[arg(help = "Absolute or relative path to C source file e.g. ./examples/test.c)")]
+    #[arg(help = "Absolute or relative path to C source file")]
     path: String,
 
-    #[arg(long, help = "Runs the lexer, but stop before parsing")]
+    #[arg(long, help = "Runs the lexer and exits")]
     lex: bool,
 
-    #[arg(
-        long,
-        help = "Runs the lexer and parser, but stop before assembly generation"
-    )]
+    #[arg(long, help = "Runs the parser and exits")]
     parse: bool,
 
-    #[arg(
-        long = "code-gen",
-        help = "Perform lexing, parsing and assembly generation but stop before code emission"
-    )]
+    #[arg(long = "code-gen", help = "Runs assembly generation and exits")]
     codegen: bool,
 }
 
@@ -34,18 +27,16 @@ fn main() {
         .finish();
 
     if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
-        eprintln!("Failed to initialize tracing: {}", e);
-        process::exit(1);
+        exit(format!("Failed to set tracing subscriber: {}", e));
     }
 
     let args = Args::parse();
     let path = Path::new(&args.path);
 
     if !path.exists() || !path.is_file() {
-        eprintln!("File not found: {}", args.path);
-        process::exit(1);
+        exit("Input path does not exist or is not a file.");
     }
-    
+
     let stop_after = if args.lex {
         Some(ccr::CompileStep::Lex)
     } else if args.parse {
@@ -55,7 +46,5 @@ fn main() {
     } else {
         None
     };
-
     build(path, stop_after);
-    process::exit(0);
 }

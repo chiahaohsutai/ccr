@@ -1,77 +1,80 @@
-use std::fs;
+use std::{fs, process};
 use std::path::Path;
-use std::process;
-use tempfile::Builder;
-use tracing::info;
+use tempfile::{Builder, NamedTempFile};
+use tracing::{error, info};
 
 pub mod lexer;
 pub mod tokens;
 
-fn preprocess(input: &Path, output: &Path) {
+
+/// Terminate the program with an error message.
+pub fn exit<T: AsRef<str>>(message: T) -> ! {
+    error!("Exiting: {}", message.as_ref());
+    eprintln!("{}", message.as_ref());
+    process::exit(1);
+}
+
+/// Terminate the program with a success message.
+fn done<T: AsRef<str>>(message: T) -> ! {
+    info!("{}", message.as_ref());
+    process::exit(0);
+}
+
+/// Preprocess the .c file into a .i file.
+fn preprocess(input: &Path) -> NamedTempFile {
     info!("Starting preprocessing with gcc...");
 
-    let input = input.to_str().unwrap();
-    let output = output.to_str().unwrap();
+    let tmp = match Builder::new().suffix(".i").tempfile() {
+        Ok(file) => file,
+        Err(e) => exit(format!("Failed to .i file: {e}"))
+    };
 
     let status = process::Command::new("gcc")
-        .args(["-E", "-P", input, "-o", output])
+        .args(["-E", "-P"])
+        .arg(input)
+        .arg("-o")
+        .arg(tmp.path())
         .status();
 
     match status {
-        Ok(s) if s.success() => info!("Preprocessing completed successfully."),
-        Ok(s) => {
-            eprintln!("Preprocessing failed with exit code: {}", s);
-            process::exit(1);
-        }
-        Err(e) => {
-            eprintln!("Failed to execute gcc for preprocessing: {}", e);
-            process::exit(1);
-        }
-    };
+        Ok(status) if status.success() => tmp,
+        _ => exit("Preprocessing failed."),
+    }
 }
 
+/// Compilation steps where the compiler can stop early.
 pub enum CompileStep {
     Lex,
     Parse,
     CodeGen,
 }
 
-fn compile(input: &Path, stop_after: Option<CompileStep>) {
-    let source = fs::read_to_string(input);
-    if let Err(e) = source {
-        eprintln!("Failed to read preprocessed file: {}", e);
-        process::exit(1);
-    }
-    let source = source.unwrap();
+/// Compile the preprocessed .i file, optionally stopping after a specified step.
+fn compile(input: &Path, stop_after: Option<CompileStep>) -> NamedTempFile {
+    info!("Starting compilation...");
 
-    let _ = lexer::lex(&source);
+    if input.ends_with("i") {
+        exit("Input file should not be a preprocessed file (.i).");
+    }
+    let _ = match fs::read_to_string(input) {
+        Ok(content) => lexer::lex(&content),
+        Err(e) => exit(format!("Failed to read preprocessed file: {e}")),
+    };
     if matches!(stop_after, Some(CompileStep::Lex)) {
-        info!("Lexing completed, exiting as requested.");
-        process::exit(0);
+        done("Lexing completed, exiting as requested.");
     }
-
     todo!();
 }
 
-fn assemble() {
-    todo!();
-}
-
+/// Link the generated assembly into an executable.
 fn link() {
     todo!();
 }
 
+/// Build the entire compilation pipeline, optionally stopping after a specified step.
 pub fn build(input: &Path, stop_after: Option<CompileStep>) {
-    let tmp = Builder::new().suffix(".i").tempfile();
-    let tmp = match tmp {
-        Ok(f) => f.path().to_path_buf(),
-        Err(e) => {
-            eprintln!("Failed to create temporary file for preprocessing: {}", e);
-            process::exit(1);
-        }
-    };
-    preprocess(input, &tmp);
-    compile(&tmp, stop_after);
-    assemble();
+    let intermediate = preprocess(input);
+    let _ = compile(intermediate.path(), stop_after);
     link();
+    done("Build completed successfully.");
 }
