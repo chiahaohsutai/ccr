@@ -1,5 +1,6 @@
 use std::process;
 
+/// Delimiters in C source code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Delimiter {
     LPAREN,

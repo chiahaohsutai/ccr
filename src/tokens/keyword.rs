@@ -1,5 +1,6 @@
 use std::process;
 
+/// Keywords in C source code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Keyword {
     INT,
