@@ -26,7 +26,7 @@ fn preprocess(input: &Path) -> NamedTempFile {
 
     let tmp = match Builder::new().suffix(".i").tempfile() {
         Ok(file) => file,
-        Err(e) => exit(format!("Failed to .i file: {e}"))
+        Err(e) => exit(format!("Failed to create .i file: {e}"))
     };
 
     let status = process::Command::new("gcc")
@@ -53,8 +53,8 @@ pub enum CompileStep {
 fn compile(input: &Path, stop_after: Option<CompileStep>) -> NamedTempFile {
     info!("Starting compilation...");
 
-    if input.ends_with("i") {
-        exit("Input file should not be a preprocessed file (.i).");
+    if input.extension().and_then(|s| s.to_str()).unwrap_or("") != "i" {
+        exit("Invalid input file, file must have .i extension.");
     }
     let _ = match fs::read_to_string(input) {
         Ok(content) => lexer::lex(&content),
