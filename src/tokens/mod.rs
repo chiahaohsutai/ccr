@@ -1,5 +1,5 @@
-pub mod delimiter;
-pub mod keyword;
+mod delimiter;
+mod keyword;
 
 pub use delimiter::Delimiter;
 pub use keyword::Keyword;

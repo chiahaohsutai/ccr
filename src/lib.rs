@@ -5,6 +5,7 @@ use tracing::{error, info};
 
 pub mod lexer;
 pub mod tokens;
+pub mod parser;
 
 
 /// Terminate the program with an error message.
@@ -56,13 +57,17 @@ fn compile(input: &Path, stop_after: Option<CompileStep>) -> NamedTempFile {
     if input.extension().and_then(|s| s.to_str()).unwrap_or("") != "i" {
         exit("Invalid input file, file must have .i extension.");
     }
-    let _ = match fs::read_to_string(input) {
+    let tokens = match fs::read_to_string(input) {
         Ok(content) => lexer::lex(&content),
         Err(e) => exit(format!("Failed to read preprocessed file: {e}")),
     };
     if matches!(stop_after, Some(CompileStep::Lex)) {
         done("Lexing completed, exiting as requested.");
     }
+    let _ = parser::parse(tokens);
+    if matches!(stop_after, Some(CompileStep::Parse)) {
+        done("Parsing completed, exiting as requested.");
+    };
     todo!();
 }
 

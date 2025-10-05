@@ -10,7 +10,7 @@ const DELIMITER_PATTERN: &str = r"[\(\);\{\}]";
 
 struct Match(Token, usize);
 
-/// Match the prefix of `s` against the given regex `pattern`.
+/// Match the prefix of parameter `s` against the given regex `pattern`.
 fn match_prefix(s: &str, pattern: &str) -> Option<String> {
     let pattern = format!(r"^{}", pattern);
     let re = Regex::new(&pattern).unwrap();
@@ -19,7 +19,7 @@ fn match_prefix(s: &str, pattern: &str) -> Option<String> {
     re.find(s).map(|m| String::from(m.as_str()))
 }
 
-/// Try to match an identifier or keyword at the start of `s`.
+/// Try to match an identifier or keyword at the start of parameter `s`.
 fn match_identifier(s: &str) -> Option<Match> {
     let candidate = match_prefix(s, IDENTIFIER_PATTERN)?;
     let length = candidate.len();
@@ -33,7 +33,7 @@ fn match_identifier(s: &str) -> Option<Match> {
     }
 }
 
-/// Try to match a constant at the start of `s`.
+/// Try to match a constant at the start of parameter parameter `s`.
 fn match_constant(s: &str) -> Option<Match> {
     let candidate = match_prefix(s, CONSTANT_PATTERN)?;
     let length = candidate.len();
@@ -42,7 +42,7 @@ fn match_constant(s: &str) -> Option<Match> {
     Some(Match(Token::CONSTANT(value), length))
 }
 
-/// Try to match a delimiter at the start of `s`.
+/// Try to match a delimiter at the start of parameter `s`.
 fn match_delimiter(s: &str) -> Option<Match> {
     let candidate = match_prefix(s, DELIMITER_PATTERN)?;
     let length = candidate.len();
@@ -51,7 +51,7 @@ fn match_delimiter(s: &str) -> Option<Match> {
     Some(Match(Token::DELIMITER(delim), length))
 }
 
-/// Try to match any token at the start of `s`.
+/// Try to match any token at the start of parameter `s`.
 fn tokenize(s: &str) -> Option<Match> {
     match_identifier(s)
         .or_else(|| match_constant(s))
@@ -81,7 +81,6 @@ pub fn lex(input: &str) -> Vec<Token> {
             process::exit(1);
         }
     }
-
     info!("Lexing completed successfully with {} tokens.", tokens.len());
     tokens
 }

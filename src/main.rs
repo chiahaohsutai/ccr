@@ -1,4 +1,3 @@
-use ccr::{build, exit};
 use clap::Parser;
 use std::path::Path;
 use tracing::Level;
@@ -27,14 +26,14 @@ fn main() {
         .finish();
 
     if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
-        exit(format!("Failed to set tracing subscriber: {}", e));
+        ccr::exit(format!("Failed to set tracing subscriber: {}", e));
     }
 
     let args = Args::parse();
     let path = Path::new(&args.path);
 
     if !path.exists() || !path.is_file() {
-        exit("Input path does not exist or is not a file.");
+        ccr::exit("Input path does not exist or is not a file.");
     }
 
     let stop_after = if args.lex {
@@ -46,5 +45,5 @@ fn main() {
     } else {
         None
     };
-    build(path, stop_after);
+    ccr::build(path, stop_after);
 }
