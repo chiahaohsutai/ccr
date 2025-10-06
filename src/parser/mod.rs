@@ -1,11 +1,9 @@
-use std::collections::VecDeque;
-
 use crate::exit;
 use crate::tokens::{Delimiter, Keyword, Token};
+use std::collections::VecDeque;
 
-mod variables;
-
-use variables::{Expression, Identifier, Integer, Statement, Function, Program};
+mod vars;
+pub use vars::{Expression, Function, Identifier, Integer, Program, Statement};
 
 /// Parses identifier production rule.
 fn parse_identifier(tokens: &mut VecDeque<Token>) -> Identifier {
@@ -28,7 +26,7 @@ fn parse_integer(tokens: &mut VecDeque<Token>) -> Integer {
 /// Parses expression production rule.
 fn parse_expression(tokens: &mut VecDeque<Token>) -> Expression {
     let integer = parse_integer(tokens);
-    Expression::Int(integer)
+    Expression::INT(integer)
 }
 
 /// Parses statement production rule.
@@ -37,7 +35,7 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Statement {
         Some(Token::KEYWORD(Keyword::RETURN)) => {
             let expr = parse_expression(tokens);
             match tokens.pop_front() {
-                Some(Token::DELIMITER(Delimiter::SEMICOLON)) => Statement::Return(expr),
+                Some(Token::DELIMITER(Delimiter::SEMICOLON)) => Statement::RETURN(expr),
                 _ => exit("Expected ';' after return expression."),
             }
         }
@@ -47,26 +45,30 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Statement {
 }
 
 /// Parses function production rule.
-fn parse_function(tokens: &mut VecDeque<Token>) -> Function{
+fn parse_function(tokens: &mut VecDeque<Token>) -> Function {
     match tokens.pop_front() {
         Some(Token::KEYWORD(Keyword::INT)) => {
             let identifier = parse_identifier(tokens);
             match (tokens.pop_front(), tokens.pop_front(), tokens.pop_front()) {
-                (Some(Token::DELIMITER(Delimiter::LPAREN)), Some(Token::KEYWORD(Keyword::VOID)), Some(Token::DELIMITER(Delimiter::RPAREN))) => {
-                    match tokens.pop_front() {
-                        Some(Token::DELIMITER(Delimiter::LBRACE)) => {
-                            let statement = parse_statement(tokens);
-                            match tokens.pop_front() {
-                                Some(Token::DELIMITER(Delimiter::RBRACE)) => Function::new(identifier, statement),
-                                _ => exit("Expected '}' at the end of function body."),
+                (
+                    Some(Token::DELIMITER(Delimiter::LPAREN)),
+                    Some(Token::KEYWORD(Keyword::VOID)),
+                    Some(Token::DELIMITER(Delimiter::RPAREN)),
+                ) => match tokens.pop_front() {
+                    Some(Token::DELIMITER(Delimiter::LBRACE)) => {
+                        let statement = parse_statement(tokens);
+                        match tokens.pop_front() {
+                            Some(Token::DELIMITER(Delimiter::RBRACE)) => {
+                                Function::new(identifier, statement)
                             }
+                            _ => exit("Expected '}' at the end of function body."),
                         }
-                        _ => exit("Expected '{' at the start of function body."),
                     }
-                }
+                    _ => exit("Expected '{' at the start of function body."),
+                },
                 _ => exit("Expected '(void)' after function name."),
             }
-         }
+        }
         None => exit("Unexpected end of input while parsing function."),
         _ => exit("Expected 'int' keyword at the start of a function."),
     }
@@ -74,7 +76,7 @@ fn parse_function(tokens: &mut VecDeque<Token>) -> Function{
 
 /// Parses program production rule.
 fn parse_program(tokens: &mut VecDeque<Token>) -> Program {
-    let program = Program::new(parse_function(tokens));
+    let program = Program::from(parse_function(tokens));
     if !tokens.is_empty() {
         exit("Unexpected tokens after parsing complete program.");
     };

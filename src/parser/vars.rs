@@ -1,6 +1,6 @@
-
 use crate::tokens::Token;
 
+/// Represents an integer constant in the AST.
 pub struct Integer(Token);
 
 impl From<Token> for Integer {
@@ -12,6 +12,7 @@ impl From<Token> for Integer {
     }
 }
 
+/// Represents an identifier in the AST.
 pub struct Identifier(Token);
 
 impl From<Token> for Identifier {
@@ -23,26 +24,34 @@ impl From<Token> for Identifier {
     }
 }
 
+/// Represents an expression in the AST.
 pub enum Expression {
-    Int(Integer),
+    INT(Integer),
 }
 
+/// Represents a statement in the AST.
 pub enum Statement {
-    Return(Expression),
+    RETURN(Expression),
 }
 
-pub struct Function(Identifier, Statement);
+/// Represents a function in the AST.
+pub struct Function {
+    name: Identifier,
+    body: Statement, 
+}
 
+/// Methods for the Function struct.
 impl Function {
     pub fn new(identifier: Identifier, statement: Statement) -> Self {
-        Function(identifier, statement)
+        Function { name: identifier, body: statement }
     }
 }
 
+/// Represents a complete program in the AST.
 pub struct Program(Function);
 
-impl Program {
-    pub fn new(function: Function) -> Self {
+impl From<Function> for Program {
+    fn from(function: Function) -> Self {
         Program(function)
     }
 }
