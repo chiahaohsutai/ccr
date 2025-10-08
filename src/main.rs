@@ -16,7 +16,7 @@ struct Args {
     #[arg(long, help = "Runs the parser and exits")]
     parse: bool,
 
-    #[arg(long = "code-gen", help = "Runs assembly generation and exits")]
+    #[arg(long, help = "Runs assembly generation and exits")]
     codegen: bool,
 }
 
