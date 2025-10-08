@@ -8,7 +8,7 @@ pub use vars::{Expression, Function, Identifier, Integer, Program, Statement};
 /// Parses identifier production rule.
 fn parse_identifier(tokens: &mut VecDeque<Token>) -> Identifier {
     match tokens.pop_front() {
-        Some(Token::IDENTIFIER(name)) => Identifier::from(Token::IDENTIFIER(name)),
+        Some(Token::IDENTIFIER(name)) => Identifier::from(name),
         None => exit("Unexpected end of input while parsing identifier."),
         _ => exit("Expected identifier."),
     }
@@ -17,7 +17,7 @@ fn parse_identifier(tokens: &mut VecDeque<Token>) -> Identifier {
 /// Parses integer production rule.
 fn parse_integer(tokens: &mut VecDeque<Token>) -> Integer {
     match tokens.pop_front() {
-        Some(Token::CONSTANT(value)) => Integer::from(Token::CONSTANT(value)),
+        Some(Token::CONSTANT(number)) => Integer::from(number),
         None => exit("Unexpected end of input while parsing integer."),
         _ => exit("Expected integer constant."),
     }
