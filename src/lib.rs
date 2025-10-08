@@ -3,6 +3,7 @@ use std::path::Path;
 use tempfile::{Builder, NamedTempFile};
 use tracing::{error, info};
 
+pub mod codegen;
 pub mod lexer;
 pub mod tokens;
 pub mod parser;
@@ -64,9 +65,13 @@ fn compile(input: &Path, stop_after: Option<CompileStep>) -> NamedTempFile {
     if matches!(stop_after, Some(CompileStep::Lex)) {
         done("Lexing completed, exiting as requested.");
     }
-    let _ = parser::parse(tokens);
+    let program = parser::parse(tokens);
     if matches!(stop_after, Some(CompileStep::Parse)) {
         done("Parsing completed, exiting as requested.");
+    };
+    let _ = codegen::Program::from(program);
+    if matches!(stop_after, Some(CompileStep::CodeGen)) {
+        done("Code generation completed, exiting as requested.");
     };
     todo!();
 }
