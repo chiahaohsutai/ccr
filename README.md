@@ -1,4 +1,4 @@
-# CCR-Rust – A C Compiler in Rust  
+# CCR – A C Compiler in Rust  
 
 This project implements the full compiler described in Raymond Rhine’s *Writing a C Compiler*, written in Rust and built on macOS (both Intel & Apple Silicon). The compiler supports a working subset of the C language and produces native executables for your machine. The project includes all four core compiler stages:  
   1. **Lexing** – tokenising the input source.  
