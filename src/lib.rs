@@ -105,7 +105,7 @@ fn link(input: &Path, output: &Path) {
     if status.is_err() || !status.unwrap().success() {
         exit("Linking failed.");
     };
-    info!("Program linked successfully to {}", output.display());
+    info!("Program linked successfully!");
 }
 
 /// Build the entire compilation pipeline, optionally stopping after a specified step.
@@ -122,5 +122,5 @@ pub fn build(input: &Path, stop_after: Option<CompileStep>) {
 
     let output = parent.join(name);
     link(source.path(), &output);
-    done("Build completed successfully.");
+    done("Build completed successfully!");
 }
