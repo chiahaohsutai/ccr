@@ -3,6 +3,7 @@ use crate::tokens::{Delimiter, Keyword, Token};
 use std::collections::VecDeque;
 
 mod vars;
+use tracing::info;
 pub use vars::{Expression, Function, Identifier, Integer, Program, Statement};
 
 /// Parses identifier production rule.
@@ -86,5 +87,6 @@ fn parse_program(tokens: &mut VecDeque<Token>) -> Program {
 /// Parses a token list into AST.
 pub fn parse(tokens: Vec<Token>) -> Program {
     let mut token_queue: VecDeque<Token> = VecDeque::from(tokens);
+    info!("Generating AST...");
     parse_program(&mut token_queue)
 }

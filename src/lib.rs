@@ -24,7 +24,7 @@ fn done<T: AsRef<str>>(message: T) -> ! {
 
 /// Preprocess the .c file into a .i file.
 fn preprocess(input: &Path) -> NamedTempFile {
-    info!("Starting preprocessing with gcc...");
+    info!("Preprocessing with gcc...");
 
     let tmp = match Builder::new().suffix(".i").tempfile() {
         Ok(file) => file,
@@ -54,13 +54,13 @@ pub enum CompileStep {
 
 /// Compile the preprocessed .i file, optionally stopping after a specified step.
 fn compile(input: &Path, stop_after: Option<CompileStep>) -> NamedTempFile {
-    info!("Starting compilation...");
+    info!("Compiling...");
 
     if input.extension().and_then(|s| s.to_str()).unwrap_or("") != "i" {
         exit("Invalid input file, file must have .i extension.");
     }
 
-    info!("Reading preprocessed file: {}", input.display());
+    info!("Lexing...");
     let tokens = match fs::read_to_string(input) {
         Ok(content) => lexer::lex(&content),
         Err(e) => exit(format!("Failed to read preprocessed file: {e}")),
@@ -69,13 +69,13 @@ fn compile(input: &Path, stop_after: Option<CompileStep>) -> NamedTempFile {
         done("Lexing completed, exiting as requested.");
     }
 
-    info!("Starting parsing...");
+    info!("Parsing...");
     let program = parser::parse(tokens);
     if matches!(stop_after, Some(CompileStep::Parse)) {
         done("Parsing completed, exiting as requested.");
     };
 
-    info!("Starting code generation...");
+    info!("Generating assembly instructions...");
     let assembly = assembly::Program::from(program);
     if matches!(stop_after, Some(CompileStep::CodeGen)) {
         done("Code generation completed, exiting as requested.");
@@ -94,7 +94,7 @@ fn compile(input: &Path, stop_after: Option<CompileStep>) -> NamedTempFile {
 
 /// Link the generated assembly into an executable.
 fn link(input: &Path, output: &Path) {
-    info!("Starting linking with gcc...");
+    info!("Linking with gcc...");
 
     let status = process::Command::new("gcc")
         .arg(input)
@@ -116,6 +116,7 @@ pub fn build(input: &Path, stop_after: Option<CompileStep>) {
     let name = input.file_stem().unwrap_or_else(|| {
         exit("Failed to get input file stem.")
     });
+    info!("Building project...");
 
     let intermediate = preprocess(input);
     let source = compile(intermediate.path(), stop_after);

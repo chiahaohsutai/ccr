@@ -60,10 +60,10 @@ fn tokenize(s: &str) -> Option<Match> {
 
 /// Lex the input C source code into a vector of tokens.
 pub fn lex(input: &str) -> Vec<Token> {
-    info!("Starting lexing process...");
     let mut tokens = Vec::new();
     let mut i = 0;
 
+    info!("Tokenizing input...");
     while i < input.len() {
         while i < input.len() && input[i..].starts_with(char::is_whitespace) {
             i += 1;
@@ -81,6 +81,6 @@ pub fn lex(input: &str) -> Vec<Token> {
             process::exit(1);
         }
     }
-    info!("Lexing completed successfully with {} tokens.", tokens.len());
+    info!("Lexing completed successfully with {} tokens", tokens.len());
     tokens
 }

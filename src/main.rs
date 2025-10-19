@@ -1,6 +1,6 @@
 use clap::{ArgGroup, CommandFactory, Parser, FromArgMatches};
 use std::{path::Path, process};
-use tracing::Level;
+use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
 use ccr::CompileStep;
 
@@ -61,5 +61,7 @@ fn main() {
     } else {
         None
     };
+
+    info!("Executing CCR...");
     ccr::build(path, stop_after);
 }
