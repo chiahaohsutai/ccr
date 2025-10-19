@@ -1,11 +1,11 @@
-use clap::Parser;
-use std::path::Path;
+use clap::{ArgGroup, CommandFactory, Parser, FromArgMatches};
+use std::{path::Path, process};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
+use ccr::CompileStep;
 
-#[derive(Parser)]
-#[command(name = "CCR")]
-#[command(about = "C compiler written in Rust", long_about = None)]
+#[derive(Parser, Debug)]
+#[command(name = "CCR", about = "C compiler written in Rust", long_about = None)]
 struct Args {
     #[arg(help = "Absolute or relative path to C source file")]
     path: String,
@@ -18,6 +18,22 @@ struct Args {
 
     #[arg(long, help = "Runs assembly generation and exits")]
     codegen: bool,
+}
+
+impl Args {
+    fn parse() -> Self {
+        let cmd = Self::command().group(
+            ArgGroup::new("stop_after")
+                .args(["lex", "parse", "codegen"])
+                .multiple(false)
+                .required(false),
+        );
+        let matches = cmd.get_matches();
+        Self::from_arg_matches(&matches).unwrap_or_else(|e| {
+            eprintln!("{}", e);
+            process::exit(1);
+        })
+    }
 }
 
 fn main() {
@@ -37,11 +53,11 @@ fn main() {
     }
 
     let stop_after = if args.lex {
-        Some(ccr::CompileStep::Lex)
+        Some(CompileStep::Lex)
     } else if args.parse {
-        Some(ccr::CompileStep::Parse)
+        Some(CompileStep::Parse)
     } else if args.codegen {
-        Some(ccr::CompileStep::CodeGen)
+        Some(CompileStep::CodeGen)
     } else {
         None
     };
