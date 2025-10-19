@@ -56,4 +56,15 @@ cargo run -- --codegen path/to/my_program.c
 **Prerequisites**:
 - Rust toolchain installed (via `rustup`)  
 - `cargo` (comes with Rust)  
-- Unix-style linking tools (installed by default on macOS)  
+- Unix-style linking tools (installed by default on macOS)
+
+```bash
+# If on Apple Silicon Mac, run the shell in Intel (x86_64) mode:
+arch -x86_64 zsh
+
+# Build the project
+cargo build
+
+# Run the compiler
+cargo run -- path/to/my_program.c
+```
