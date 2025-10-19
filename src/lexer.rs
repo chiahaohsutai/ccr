@@ -15,7 +15,7 @@ fn match_prefix(s: &str, pattern: &str) -> Option<String> {
     let pattern = format!(r"^{}", pattern);
     let re = Regex::new(&pattern).unwrap();
 
-    eprintln!("Trying to match '{}' against pattern '{}'", s, pattern);
+    // eprintln!("Trying to match '{}' against pattern '{}'", s, pattern);
     re.find(s).map(|m| String::from(m.as_str()))
 }
 
@@ -23,7 +23,7 @@ fn match_prefix(s: &str, pattern: &str) -> Option<String> {
 fn match_identifier(s: &str) -> Option<Match> {
     let candidate = match_prefix(s, IDENTIFIER_PATTERN)?;
     let length = candidate.len();
-    eprint!("Matched identifier candidate: '{}'\n", candidate);
+    // eprint!("Matched identifier candidate: '{}'\n", candidate);
 
     if Regex::new(KEYWORD_PATTERN).unwrap().is_match(&candidate) {
         let kw = Keyword::from(candidate.as_str());
@@ -73,11 +73,11 @@ pub fn lex(input: &str) -> Vec<Token> {
         }
 
         if let Some(Match(token, length)) = tokenize(&input[i..]) {
-            eprint!("Matched token: {:?}\n", token);
+            // eprint!("Matched token: {:?}\n", token);
             tokens.push(token);
             i += length;
         } else {
-            eprintln!("Unexpected character: {}", &input[i..]);
+            // eprintln!("Unexpected character: {}", &input[i..]);
             process::exit(1);
         }
     }
