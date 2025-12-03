@@ -1,11 +1,12 @@
-use super::tokens::{Delimiter, Keyword, Token};
+use super::tokens::{Delimiter, Keyword, Operator, Token, UnaryOp};
 use regex::Regex;
+use std::{cmp, process};
 use tracing::info;
-use std::process;
 
 const IDENTIFIER_PATTERN: &str = r"[a-zA-Z]\w*\b";
 const CONSTANT_PATTERN: &str = r"[0-9]+\b";
 const KEYWORD_PATTERN: &str = r"int|void|return\b";
+const UNARY_OPERATOR_PATTERN: &str = r"--|[\-~]";
 const DELIMITER_PATTERN: &str = r"[\(\);\{\}]";
 
 struct Match(Token, usize);
@@ -14,48 +15,60 @@ struct Match(Token, usize);
 fn match_prefix(s: &str, pattern: &str) -> Option<String> {
     let pattern = format!(r"^{}", pattern);
     let re = Regex::new(&pattern).unwrap();
-
-    // eprintln!("Trying to match '{}' against pattern '{}'", s, pattern);
     re.find(s).map(|m| String::from(m.as_str()))
 }
 
-/// Try to match an identifier or keyword at the start of parameter `s`.
+/// Match an identifier or keyword at the start of parameter `s`.
 fn match_identifier(s: &str) -> Option<Match> {
     let candidate = match_prefix(s, IDENTIFIER_PATTERN)?;
-    let length = candidate.len();
-    // eprint!("Matched identifier candidate: '{}'\n", candidate);
 
     if Regex::new(KEYWORD_PATTERN).unwrap().is_match(&candidate) {
         let kw = Keyword::from(candidate.as_str());
-        Some(Match(Token::KEYWORD(kw), length))
+        Some(Match(Token::KEYWORD(kw), candidate.len()))
     } else {
+        let length = candidate.len();
         Some(Match(Token::IDENTIFIER(candidate), length))
     }
 }
 
-/// Try to match a constant at the start of parameter parameter `s`.
+/// Match a constant at the start of parameter parameter `s`.
 fn match_constant(s: &str) -> Option<Match> {
     let candidate = match_prefix(s, CONSTANT_PATTERN)?;
-    let length = candidate.len();
-
     let value: i64 = candidate.parse().ok()?;
-    Some(Match(Token::CONSTANT(value), length))
+    Some(Match(Token::CONSTANT(value), candidate.len()))
 }
 
-/// Try to match a delimiter at the start of parameter `s`.
+/// Match a unary operator at the start of parameter `s`.
+fn match_unary_op(s: &str) -> Option<Match> {
+    let candidate = match_prefix(s, UNARY_OPERATOR_PATTERN)?;
+    let op = Operator::UNARY(UnaryOp::from(candidate.as_str()));
+    Some(Match(Token::OPERATOR(op), candidate.len()))
+}
+
+/// Match a delimiter at the start of parameter `s`.
 fn match_delimiter(s: &str) -> Option<Match> {
     let candidate = match_prefix(s, DELIMITER_PATTERN)?;
-    let length = candidate.len();
-
     let delim = Delimiter::from(candidate.as_str());
-    Some(Match(Token::DELIMITER(delim), length))
+    Some(Match(Token::DELIMITER(delim), candidate.len()))
 }
 
-/// Try to match any token at the start of parameter `s`.
+/// Match any token at the start of parameter `s`.
 fn tokenize(s: &str) -> Option<Match> {
-    match_identifier(s)
-        .or_else(|| match_constant(s))
-        .or_else(|| match_delimiter(s))
+    let matches = [
+        match_identifier(s),
+        match_constant(s),
+        match_unary_op(s),
+        match_delimiter(s),
+    ];
+    matches
+        .into_iter()
+        .max_by(|m1, m2| match (m1, m2) {
+            (Some(Match(_, len1)), Some(Match(_, len2))) => len1.cmp(&len2),
+            (Some(_), None) => cmp::Ordering::Greater,
+            (None, Some(_)) => cmp::Ordering::Less,
+            (None, None) => cmp::Ordering::Equal,
+        })
+        .flatten()
 }
 
 /// Lex the input C source code into a vector of tokens.
@@ -73,11 +86,9 @@ pub fn lex(input: &str) -> Vec<Token> {
         }
 
         if let Some(Match(token, length)) = tokenize(&input[i..]) {
-            // eprint!("Matched token: {:?}\n", token);
             tokens.push(token);
             i += length;
         } else {
-            // eprintln!("Unexpected character: {}", &input[i..]);
             process::exit(1);
         }
     }
