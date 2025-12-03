@@ -21,7 +21,7 @@ impl From<&str> for Delimiter {
             _ => {
                 eprintln!("Unknown delimiter: {}", s);
                 process::exit(1);
-            },
+            }
         }
     }
 }
