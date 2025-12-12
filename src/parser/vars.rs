@@ -1,3 +1,5 @@
+use crate::tokens;
+
 /// Represents an integer constant in the AST.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Integer(i64);
@@ -36,16 +38,48 @@ impl From<Identifier> for String {
     }
 }
 
-/// Represents an expression in the AST.
+/// Represents unary operators in the AST.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnOp {
+    NEGATION,
+    BITWISENOT,
+}
+
+impl From<tokens::UnaryOp> for UnOp {
+    fn from(op: tokens::UnaryOp) -> Self {
+        match op {
+            tokens::UnaryOp::NEGATION => UnOp::NEGATION,
+            tokens::UnaryOp::BITWISENOT => UnOp::BITWISENOT,
+            tokens::UnaryOp::DECREMENT => {
+                panic!("DECREMENT operator is not supported in AST.")
+            }
+        }
+    }
+}
+
+/// Represents an expression in the AST.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expression {
     INT(Integer),
+    UNARY(UnOp, Box<Expression>),
+}
+
+impl From<i64> for Expression {
+    fn from(value: i64) -> Self {
+        Expression::INT(Integer::from(value))
+    }
 }
 
 /// Represents a statement in the AST.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     RETURN(Expression),
+}
+
+impl From<Function> for Statement {
+    fn from(function: Function) -> Self {
+        function.body
+    }
 }
 
 /// Represents a function in the AST.
@@ -58,10 +92,16 @@ pub struct Function {
 /// Methods for the Function struct.
 impl Function {
     pub fn new(identifier: Identifier, statement: Statement) -> Self {
-        Function { name: identifier, body: statement }
+        Function {
+            name: identifier,
+            body: statement,
+        }
     }
     pub fn body(&self) -> &Statement {
         &self.body
+    }
+    pub fn name(&self) -> &Identifier {
+        &self.name
     }
 }
 

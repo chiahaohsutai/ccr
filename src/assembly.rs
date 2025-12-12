@@ -1,4 +1,4 @@
-use crate::parser::{self, Identifier};
+use crate::parser;
 use std::fmt;
 
 /// Represents an operation's operand in assembly.
@@ -21,6 +21,7 @@ impl From<parser::Expression> for Operand {
     fn from(expression: parser::Expression) -> Self {
         match expression {
             parser::Expression::INT(integer) => Operand::IMM(integer.into()),
+            _ => todo!(),
         }
     }
 }
@@ -70,14 +71,15 @@ struct Function {
 impl From<parser::Function> for Function {
     fn from(function: parser::Function) -> Self {
         let mut instructions: Vec<Instruction> = Vec::new();
-        match function.body() {
-            &parser::Statement::RETURN(expression) => {
+        let name = function.name().clone().into();
+
+        match parser::Statement::from(function) {
+            parser::Statement::RETURN(expression) => {
                 let mov = Mov::new(Operand::from(expression), Operand::Register);
                 instructions.push(Instruction::MOV(mov));
                 instructions.push(Instruction::RET);
             }
         };
-        let name = String::from(Identifier::from(function));
         Function { name, instructions }
     }
 }

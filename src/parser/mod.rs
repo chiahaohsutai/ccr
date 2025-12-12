@@ -1,33 +1,29 @@
 use crate::exit;
-use crate::tokens::{Delimiter, Keyword, Token};
+use crate::tokens::{Delimiter, Keyword, Operator, Token};
 use std::collections::VecDeque;
 
 mod vars;
 use tracing::info;
-pub use vars::{Expression, Function, Identifier, Integer, Program, Statement};
-
-/// Parses identifier production rule.
-fn parse_identifier(tokens: &mut VecDeque<Token>) -> Identifier {
-    match tokens.pop_front() {
-        Some(Token::IDENTIFIER(name)) => Identifier::from(name),
-        None => exit("Unexpected end of input while parsing identifier."),
-        _ => exit("Expected identifier."),
-    }
-}
-
-/// Parses integer production rule.
-fn parse_integer(tokens: &mut VecDeque<Token>) -> Integer {
-    match tokens.pop_front() {
-        Some(Token::CONSTANT(number)) => Integer::from(number),
-        None => exit("Unexpected end of input while parsing integer."),
-        _ => exit("Expected integer constant."),
-    }
-}
+pub use vars::{Expression, Function, Identifier, Integer, Program, Statement, UnOp};
 
 /// Parses expression production rule.
 fn parse_expression(tokens: &mut VecDeque<Token>) -> Expression {
-    let integer = parse_integer(tokens);
-    Expression::INT(integer)
+    let next = tokens.pop_front();
+    match next {
+        Some(Token::CONSTANT(number)) => Expression::from(number),
+        Some(Token::OPERATOR(Operator::UNARY(op))) => {
+            let expr = parse_expression(tokens);
+            Expression::UNARY(UnOp::from(op), Box::new(expr))
+        }
+        Some(Token::DELIMITER(Delimiter::LPAREN)) => {
+            let expr = parse_expression(tokens);
+            match tokens.pop_front() {
+                Some(Token::DELIMITER(Delimiter::RPAREN)) => expr,
+                _ => exit("Expected ')' after expression."),
+            }
+        }
+        _ => exit("Malformed expression."),
+    }
 }
 
 /// Parses statement production rule.
@@ -42,6 +38,15 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Statement {
         }
         None => exit("Unexpected end of input while parsing statement."),
         _ => exit("Expected 'return' keyword at the start of a statement."),
+    }
+}
+
+/// Parses identifier production rule.
+fn parse_identifier(tokens: &mut VecDeque<Token>) -> Identifier {
+    match tokens.pop_front() {
+        Some(Token::IDENTIFIER(name)) => Identifier::from(name),
+        None => exit("Unexpected end of input while parsing identifier."),
+        _ => exit("Expected identifier."),
     }
 }
 
