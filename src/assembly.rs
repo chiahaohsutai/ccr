@@ -2,7 +2,7 @@ use crate::parser;
 use std::fmt;
 
 /// Represents an operation's operand in assembly.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Operand {
     Register,
     IMM(i64),
@@ -27,7 +27,7 @@ impl From<parser::Expression> for Operand {
 }
 
 /// Represents a MOV instruction in assembly.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 struct Mov {
     src: Operand,
     dst: Operand,
@@ -46,7 +46,7 @@ impl fmt::Display for Mov {
 }
 
 /// Represents an instruction in assembly.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 enum Instruction {
     MOV(Mov),
     RET,
@@ -62,7 +62,7 @@ impl fmt::Display for Instruction {
 }
 
 /// Represents a function in assembly.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 struct Function {
     name: String,
     instructions: Vec<Instruction>,
@@ -98,7 +98,7 @@ impl fmt::Display for Function {
 }
 
 /// Represents a complete assembly program.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Program(Function);
 
 impl From<Function> for Program {

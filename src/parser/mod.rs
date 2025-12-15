@@ -1,60 +1,59 @@
-use crate::exit;
-use crate::tokens::{Delimiter, Keyword, Operator, Token};
+use crate::tokens::{Delimiter, Keyword, Token};
 use std::collections::VecDeque;
+use tracing::info;
 
 mod vars;
-use tracing::info;
 pub use vars::{Expression, Function, Identifier, Integer, Program, Statement, UnOp};
 
 /// Parses expression production rule.
-fn parse_expression(tokens: &mut VecDeque<Token>) -> Expression {
+fn parse_expression(tokens: &mut VecDeque<Token>) -> Result<Expression, String> {
     let next = tokens.pop_front();
     match next {
-        Some(Token::CONSTANT(number)) => Expression::from(number),
-        Some(Token::OPERATOR(Operator::UNARY(op))) => {
-            let expr = parse_expression(tokens);
-            Expression::UNARY(UnOp::from(op), Box::new(expr))
+        Some(Token::CONSTANT(number)) => Ok(Expression::from(number)),
+        Some(Token::OPERATOR(op)) => {
+            let expr = parse_expression(tokens)?;
+            Ok(Expression::UNARY(UnOp::from(op), Box::new(expr)))
         }
         Some(Token::DELIMITER(Delimiter::LPAREN)) => {
             let expr = parse_expression(tokens);
             match tokens.pop_front() {
                 Some(Token::DELIMITER(Delimiter::RPAREN)) => expr,
-                _ => exit("Expected ')' after expression."),
+                _ => Err(String::from("Expected ')' after expression.")),
             }
         }
-        _ => exit("Malformed expression."),
+        _ => Err(String::from("Malformed expression.")),
     }
 }
 
 /// Parses statement production rule.
-fn parse_statement(tokens: &mut VecDeque<Token>) -> Statement {
+fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement, String> {
     match tokens.pop_front() {
         Some(Token::KEYWORD(Keyword::RETURN)) => {
-            let expr = parse_expression(tokens);
+            let expr = parse_expression(tokens)?;
             match tokens.pop_front() {
-                Some(Token::DELIMITER(Delimiter::SEMICOLON)) => Statement::RETURN(expr),
-                _ => exit("Expected ';' after return expression."),
+                Some(Token::DELIMITER(Delimiter::SEMICOLON)) => Ok(Statement::RETURN(expr)),
+                _ => Err(String::from("Expected ';' after return expression.")),
             }
         }
-        None => exit("Unexpected end of input while parsing statement."),
-        _ => exit("Expected 'return' keyword at the start of a statement."),
+        None => Err(String::from("Unexpected end of input while parsing.")),
+        _ => Err(String::from("Expected statement.")),
     }
 }
 
 /// Parses identifier production rule.
-fn parse_identifier(tokens: &mut VecDeque<Token>) -> Identifier {
+fn parse_identifier(tokens: &mut VecDeque<Token>) -> Result<Identifier, String> {
     match tokens.pop_front() {
-        Some(Token::IDENTIFIER(name)) => Identifier::from(name),
-        None => exit("Unexpected end of input while parsing identifier."),
-        _ => exit("Expected identifier."),
+        Some(Token::IDENTIFIER(name)) => Ok(Identifier::from(name)),
+        None => Err(String::from("Unexpected end of input.")),
+        _ => Err(String::from("Expected identifier.")),
     }
 }
 
 /// Parses function production rule.
-fn parse_function(tokens: &mut VecDeque<Token>) -> Function {
+fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function, String> {
     match tokens.pop_front() {
         Some(Token::KEYWORD(Keyword::INT)) => {
-            let identifier = parse_identifier(tokens);
+            let identifier = parse_identifier(tokens)?;
             match (tokens.pop_front(), tokens.pop_front(), tokens.pop_front()) {
                 (
                     Some(Token::DELIMITER(Delimiter::LPAREN)),
@@ -62,35 +61,36 @@ fn parse_function(tokens: &mut VecDeque<Token>) -> Function {
                     Some(Token::DELIMITER(Delimiter::RPAREN)),
                 ) => match tokens.pop_front() {
                     Some(Token::DELIMITER(Delimiter::LBRACE)) => {
-                        let statement = parse_statement(tokens);
+                        let statement = parse_statement(tokens)?;
                         match tokens.pop_front() {
                             Some(Token::DELIMITER(Delimiter::RBRACE)) => {
-                                Function::new(identifier, statement)
+                                Ok(Function::new(identifier, statement))
                             }
-                            _ => exit("Expected '}' at the end of function body."),
+                            _ => Err(String::from("Expected '}' at the end of fn body.")),
                         }
                     }
-                    _ => exit("Expected '{' at the start of function body."),
+                    _ => Err(String::from("Expected '{' at the start of fn body.")),
                 },
-                _ => exit("Expected '(void)' after function name."),
+                _ => Err(String::from("Expected '(void)' after fn name.")),
             }
         }
-        None => exit("Unexpected end of input while parsing function."),
-        _ => exit("Expected 'int' keyword at the start of a function."),
+        None => Err(String::from("Unexpected end of input while parsing fn.")),
+        _ => Err(String::from("Expected 'int' keyword at the start of a fn.")),
     }
 }
 
 /// Parses program production rule.
-fn parse_program(tokens: &mut VecDeque<Token>) -> Program {
-    let program = Program::from(parse_function(tokens));
+fn parse_program(tokens: &mut VecDeque<Token>) -> Result<Program, String> {
+    let program = Program::from(parse_function(tokens)?);
     if !tokens.is_empty() {
-        exit("Unexpected tokens after parsing complete program.");
+        let err = String::from("Unexpected tokens remaining after parsing program.");
+        return Err(err);
     };
-    program
+    Ok(program)
 }
 
 /// Parses a token list into AST.
-pub fn parse(tokens: Vec<Token>) -> Program {
+pub fn parse(tokens: Vec<Token>) -> Result<Program, String> {
     let mut token_queue: VecDeque<Token> = VecDeque::from(tokens);
     info!("Generating AST...");
     parse_program(&mut token_queue)

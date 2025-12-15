@@ -1,51 +1,40 @@
-use std::{fs, process};
 use std::path::Path;
+use std::{fs, process};
 use tempfile::{Builder, NamedTempFile};
-use tracing::{error, info};
+use tracing::info;
 
 pub mod assembly;
 pub mod lexer;
-pub mod tokens;
 pub mod parser;
-
-
-/// Terminate the program with an error message.
-pub fn exit<T: AsRef<str>>(message: T) -> ! {
-    error!("Exiting: {}", message.as_ref());
-    eprintln!("{}", message.as_ref());
-    process::exit(1);
-}
-
-/// Terminate the program with a success message.
-fn done<T: AsRef<str>>(message: T) -> ! {
-    info!("{}", message.as_ref());
-    process::exit(0);
-}
+pub mod tokens;
 
 /// Preprocess the .c file into a .i file.
-fn preprocess(input: &Path) -> NamedTempFile {
+fn preprocess(input: &Path) -> Result<NamedTempFile, String> {
     info!("Preprocessing with gcc...");
 
-    let tmp = match Builder::new().suffix(".i").tempfile() {
-        Ok(file) => file,
-        Err(e) => exit(format!("Failed to create .i file: {e}"))
-    };
+    let tmp = Builder::new()
+        .suffix(".i")
+        .tempfile()
+        .map_err(|e| format!("Failed to create temp file for preprocessed output: {e}"))?;
 
     let status = process::Command::new("gcc")
         .args(["-E", "-P"])
         .arg(input)
         .arg("-o")
         .arg(tmp.path())
-        .status();
+        .status()
+        .map_err(|e| format!("Preprocessing failed: {e}"))?;
 
-    match status {
-        Ok(status) if status.success() => tmp,
-        _ => exit("Preprocessing failed."),
+    if status.success() {
+        info!("Preprocessing completed successfully.");
+        Ok(tmp)
+    } else {
+        Err(format!("GCC preprocessing failed with status: {status}"))
     }
 }
 
 /// Compilation steps where the compiler can stop early.
-#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum CompileStep {
     Lex,
     Parse,
@@ -53,75 +42,86 @@ pub enum CompileStep {
 }
 
 /// Compile the preprocessed .i file, optionally stopping after a specified step.
-fn compile(input: &Path, stop_after: Option<CompileStep>) -> NamedTempFile {
+fn compile(input: &Path, stop_after: Option<CompileStep>) -> Result<Option<NamedTempFile>, String> {
     info!("Compiling...");
 
     if input.extension().and_then(|s| s.to_str()).unwrap_or("") != "i" {
-        exit("Invalid input file, file must have .i extension.");
-    }
+        return Err("Input file must have a .i extension".to_string());
+    };
+    let content = match fs::read_to_string(input) {
+        Ok(c) => c,
+        Err(e) => return Err(format!("Failed to read input file: {e}")),
+    };
 
     info!("Lexing...");
-    let tokens = match fs::read_to_string(input) {
-        Ok(content) => lexer::lex(&content),
-        Err(e) => exit(format!("Failed to read preprocessed file: {e}")),
-    };
+    let tokens = lexer::lex(&content)?;
     if matches!(stop_after, Some(CompileStep::Lex)) {
-        done("Lexing completed, exiting as requested.");
+        info!("Lexing completed, exiting as requested.");
+        return Ok(None);
     }
 
     info!("Parsing...");
     let program = parser::parse(tokens);
     if matches!(stop_after, Some(CompileStep::Parse)) {
-        done("Parsing completed, exiting as requested.");
+        info!("Parsing completed, exiting as requested.");
+        return Ok(None);
     };
 
     info!("Generating assembly instructions...");
-    let assembly = assembly::Program::from(program);
+    let assembly = assembly::Program::from(program?);
     if matches!(stop_after, Some(CompileStep::CodeGen)) {
-        done("Code generation completed, exiting as requested.");
+        info!("Code generation completed, exiting as requested.");
+        return Ok(None);
     };
-    
+
     info!("Writing assembly to temporary .s file...");
+
     let tmp = match Builder::new().suffix(".s").tempfile() {
         Ok(file) => file,
-        Err(e) => exit(format!("Failed to create .s file: {e}"))
+        Err(e) => Err(format!("Failed to create assembly output file: {e}"))?,
     };
     match fs::write(tmp.path(), assembly.to_string()) {
-        Ok(_) => tmp,
-        Err(e) => exit(format!("Failed to write assembly to file: {e}")),
+        Ok(_) => {
+            info!("Assembly written to {}", tmp.path().display());
+            Ok(Some(tmp))
+        }
+        Err(e) => Err(format!("Failed to write assembly to file: {e}")),
     }
 }
 
 /// Link the generated assembly into an executable.
-fn link(input: &Path, output: &Path) {
+fn link(input: &Path, output: &Path) -> Result<(), String> {
     info!("Linking with gcc...");
 
     let status = process::Command::new("gcc")
         .arg(input)
         .arg("-o")
         .arg(output)
-        .status();
+        .status()
+        .map_err(|e| format!("GCC command failed: {}", e))?;
 
-    if status.is_err() || !status.unwrap().success() {
-        exit("Linking failed.");
-    };
-    info!("Program linked successfully!");
+    if status.success() {
+        info!("Linking completed successfully.");
+        Ok(())
+    } else {
+        Err(format!("GCC linking failed with status: {}", status))
+    }
 }
 
-/// Build the entire compilation pipeline, optionally stopping after a specified step.
-pub fn build(input: &Path, stop_after: Option<CompileStep>) {
-    let parent = input.parent().unwrap_or_else(|| {
-        exit("Failed to get input file parent directory.")
-    });
-    let name = input.file_stem().unwrap_or_else(|| {
-        exit("Failed to get input file stem.")
-    });
-    info!("Building project...");
+/// Build the C source file into an executable, optionally stopping after a specified step.
+pub fn build(input: &Path, stop_after: Option<CompileStep>) -> Result<(), String> {
+    info!("Building...");
 
+    let name = match input.file_stem() {
+        Some(stem) => stem,
+        None => Err("Failed to get input file stem.")?,
+    };
     let intermediate = preprocess(input);
-    let source = compile(intermediate.path(), stop_after);
 
-    let output = parent.join(name);
-    link(source.path(), &output);
-    done("Build completed successfully!");
+    if let Some(src) = compile(intermediate?.path(), stop_after)? {
+        let output = input.parent().unwrap_or(Path::new(".")).join(name);
+        link(src.path(), &output)?;
+        info!("Build completed successfully! Output: {}", output.display());
+    };
+    Ok(())
 }

@@ -1,7 +1,7 @@
 use crate::tokens;
 
 /// Represents an integer constant in the AST.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Integer(i64);
 
 impl From<i64> for Integer {
@@ -17,7 +17,7 @@ impl From<Integer> for i64 {
 }
 
 /// Represents an identifier in the AST.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Identifier(String);
 
 impl From<String> for Identifier {
@@ -39,18 +39,18 @@ impl From<Identifier> for String {
 }
 
 /// Represents unary operators in the AST.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnOp {
     NEGATION,
     BITWISENOT,
 }
 
-impl From<tokens::UnaryOp> for UnOp {
-    fn from(op: tokens::UnaryOp) -> Self {
+impl From<tokens::Operator> for UnOp {
+    fn from(op: tokens::Operator) -> Self {
         match op {
-            tokens::UnaryOp::NEGATION => UnOp::NEGATION,
-            tokens::UnaryOp::BITWISENOT => UnOp::BITWISENOT,
-            tokens::UnaryOp::DECREMENT => {
+            tokens::Operator::NEGATION => UnOp::NEGATION,
+            tokens::Operator::BITWISENOT => UnOp::BITWISENOT,
+            tokens::Operator::DECREMENT => {
                 panic!("DECREMENT operator is not supported in AST.")
             }
         }
@@ -58,7 +58,7 @@ impl From<tokens::UnaryOp> for UnOp {
 }
 
 /// Represents an expression in the AST.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     INT(Integer),
     UNARY(UnOp, Box<Expression>),
@@ -71,7 +71,7 @@ impl From<i64> for Expression {
 }
 
 /// Represents a statement in the AST.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     RETURN(Expression),
 }
@@ -83,7 +83,7 @@ impl From<Function> for Statement {
 }
 
 /// Represents a function in the AST.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     name: Identifier,
     body: Statement,
