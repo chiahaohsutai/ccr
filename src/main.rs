@@ -1,67 +1,62 @@
-use clap::{ArgGroup, CommandFactory, Parser, FromArgMatches};
-use std::{path::Path, process};
-use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
 use ccr::CompileStep;
+use clap::{ArgGroup, Command, Id, arg};
+use std::{path::Path, process};
+use tracing::{Level, error};
+use tracing_subscriber::FmtSubscriber;
 
-#[derive(Parser, Debug)]
-#[command(name = "CCR", about = "C compiler written in Rust", long_about = None)]
-struct Args {
-    #[arg(help = "Absolute or relative path to C source file")]
-    path: String,
-
-    #[arg(long, help = "Runs the lexer and exits")]
-    lex: bool,
-
-    #[arg(long, help = "Runs the parser and exits")]
-    parse: bool,
-
-    #[arg(long, help = "Runs assembly generation and exits")]
-    codegen: bool,
+fn init_loggging(level: Level) {
+    let subscriber = FmtSubscriber::builder().with_max_level(level).finish();
+    if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
+        eprintln!("Failed to initialize logging tracer: {:?}", e);
+        process::exit(1);
+    }
 }
 
-impl Args {
-    fn parse() -> Self {
-        let cmd = Self::command().group(
-            ArgGroup::new("stop_after")
-                .args(["lex", "parse", "codegen"])
-                .multiple(false)
-                .required(false),
-        );
-        let matches = cmd.get_matches();
-        Self::from_arg_matches(&matches).unwrap_or_else(|e| {
-            eprintln!("{}", e);
-            process::exit(1);
-        })
-    }
+fn build_cli() -> Command {
+    let args = [
+        arg!(<path> "Absolute or relative path to C source file"),
+        arg!(--lex "Runs the lexer and exits"),
+        arg!(--parse "Runs the parser and exits"),
+        arg!(--codegen "Runs assembly generation and exits"),
+    ];
+
+    let stop_after = ArgGroup::new("stop_after")
+        .args(["lex", "parse", "codegen"])
+        .multiple(false)
+        .required(false);
+
+    Command::new("CCR")
+        .about("A C compiler written in Rust")
+        .long_about("A simple C compiler written in Rust for educational purposes.")
+        .author("Youf favorite programmer CHIA")
+        .alias("ccr")
+        .args(args)
+        .group(stop_after)
 }
 
 fn main() {
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .finish();
+    init_loggging(Level::INFO);
 
-    if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
-        ccr::exit(format!("Failed to set tracing subscriber: {}", e));
-    }
+    let args = build_cli().get_matches();
 
-    let args = Args::parse();
-    let path = Path::new(&args.path);
+    let path = Path::new(args.get_one::<String>("path").unwrap());
+    let stop_after = args
+        .get_one::<Id>("stop_after")
+        .map(|id| match id.as_str() {
+            "lex" => CompileStep::Lex,
+            "parse" => CompileStep::Parse,
+            "codegen" => CompileStep::CodeGen,
+            _ => unreachable!(),
+        });
 
     if !path.exists() || !path.is_file() {
-        ccr::exit("Input path does not exist or is not a file.");
+        eprintln!("The provided path does not exist or is not a file.");
+        process::exit(1);
     }
 
-    let stop_after = if args.lex {
-        Some(CompileStep::Lex)
-    } else if args.parse {
-        Some(CompileStep::Parse)
-    } else if args.codegen {
-        Some(CompileStep::CodeGen)
-    } else {
-        None
-    };
-
-    info!("Executing CCR...");
-    ccr::build(path, stop_after);
+    if let Err(e) = ccr::build(path, stop_after) {
+        error!("Compilation failed: {e}");
+        eprintln!("Compilation failed: {:?}", e);
+        process::exit(1);
+    }
 }
