@@ -1,14 +1,13 @@
 use ccr::CompileStep;
 use clap::{ArgGroup, Command, Id, arg};
-use std::{path::Path, process};
+use std::{path::Path, process, str::FromStr};
 use tracing::{Level, error};
 use tracing_subscriber::FmtSubscriber;
 
 fn init_loggging(level: Level) {
     let subscriber = FmtSubscriber::builder().with_max_level(level).finish();
     if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
-        eprintln!("Failed to initialize logging tracer: {:?}", e);
-        process::exit(1);
+        panic!("Failed to set global default subscriber: {}", e);
     }
 }
 
@@ -17,11 +16,12 @@ fn build_cli() -> Command {
         arg!(<path> "Absolute or relative path to C source file"),
         arg!(--lex "Runs the lexer and exits"),
         arg!(--parse "Runs the parser and exits"),
+        arg!(--tacky "Generates tacky assembly and exits"),
         arg!(--codegen "Runs assembly generation and exits"),
     ];
 
     let stop_after = ArgGroup::new("stop_after")
-        .args(["lex", "parse", "codegen"])
+        .args(["lex", "parse", "tacky", "codegen"])
         .multiple(false)
         .required(false);
 
@@ -35,28 +35,20 @@ fn build_cli() -> Command {
 }
 
 fn main() {
-    init_loggging(Level::INFO);
+    init_loggging(Level::DEBUG);
 
     let args = build_cli().get_matches();
 
     let path = Path::new(args.get_one::<String>("path").unwrap());
     let stop_after = args
         .get_one::<Id>("stop_after")
-        .map(|id| match id.as_str() {
-            "lex" => CompileStep::Lex,
-            "parse" => CompileStep::Parse,
-            "codegen" => CompileStep::CodeGen,
-            _ => unreachable!(),
-        });
+        .map(|id| CompileStep::from_str(id.as_str()).unwrap());
 
-    if !path.exists() || !path.is_file() {
-        eprintln!("The provided path does not exist or is not a file.");
-        process::exit(1);
-    }
-
-    if let Err(e) = ccr::build(path, stop_after) {
-        error!("Compilation failed: {e}");
-        eprintln!("Compilation failed: {:?}", e);
-        process::exit(1);
+    if path.exists() && path.is_file() {
+        if let Err(e) = ccr::build(path, stop_after) {
+            error!("Compilation failed: {}", e);
+            eprintln!("Compilation failed: {}", e);
+            process::exit(1);
+        }
     }
 }
