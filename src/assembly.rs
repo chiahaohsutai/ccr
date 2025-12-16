@@ -71,9 +71,11 @@ struct Function {
 impl From<parser::Function> for Function {
     fn from(function: parser::Function) -> Self {
         let mut instructions: Vec<Instruction> = Vec::new();
-        let name = function.name().clone().into();
 
-        match parser::Statement::from(function) {
+        let name = String::from(function.name().as_ref());
+        let stmt = parser::Statement::from(function);
+
+        match stmt {
             parser::Statement::RETURN(expression) => {
                 let mov = Mov::new(Operand::from(expression), Operand::Register);
                 instructions.push(Instruction::MOV(mov));

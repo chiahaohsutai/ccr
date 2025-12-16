@@ -14,9 +14,19 @@ impl FromStr for Operator {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "--" => Ok(Operator::DECREMENT),
-            "!" => Ok(Operator::NEGATION),
+            "-" => Ok(Operator::NEGATION),
             "~" => Ok(Operator::BITWISENOT),
             _ => Err(format!("Unknown operator: {}", s)),
+        }
+    }
+}
+
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Operator::DECREMENT => write!(f, "--"),
+            Operator::NEGATION => write!(f, "-"),
+            Operator::BITWISENOT => write!(f, "~"),
         }
     }
 }
@@ -37,6 +47,16 @@ impl FromStr for Keyword {
             "void" => Ok(Keyword::VOID),
             "return" => Ok(Keyword::RETURN),
             _ => Err(format!("Unknown keyword: {}", s)),
+        }
+    }
+}
+
+impl fmt::Display for Keyword {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Keyword::INT => write!(f, "int"),
+            Keyword::VOID => write!(f, "void"),
+            Keyword::RETURN => write!(f, "return"),
         }
     }
 }
@@ -65,6 +85,18 @@ impl FromStr for Delimiter {
     }
 }
 
+impl fmt::Display for Delimiter {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Delimiter::LPAREN => write!(f, "("),
+            Delimiter::RPAREN => write!(f, ")"),
+            Delimiter::SEMICOLON => write!(f, ";"),
+            Delimiter::LBRACE => write!(f, "{{"),
+            Delimiter::RBRACE => write!(f, "}}"),
+        }
+    }
+}
+
 /// Tokens in C source code.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
@@ -78,11 +110,11 @@ pub enum Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Token::CONSTANT(value) => write!(f, "CONSTANT({})", value),
-            Token::KEYWORD(kw) => write!(f, "KEYWORD({:?})", kw),
-            Token::IDENTIFIER(name) => write!(f, "IDENTIFIER({})", name),
-            Token::OPERATOR(op) => write!(f, "OPERATOR({:?})", op),
-            Token::DELIMITER(delim) => write!(f, "DELIMITER({:?})", delim),
+            Token::CONSTANT(value) => write!(f, "{}", value),
+            Token::KEYWORD(kw) => write!(f, "{}", kw),
+            Token::IDENTIFIER(name) => write!(f, "{}", name),
+            Token::OPERATOR(op) => write!(f, "{}", op),
+            Token::DELIMITER(delim) => write!(f, "{}", delim),
         }
     }
 }

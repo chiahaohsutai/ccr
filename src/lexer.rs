@@ -1,4 +1,4 @@
-use super::tokens;
+use super::tokens::{self, Token};
 use regex::Regex;
 use std::str::FromStr;
 use tracing::info;
@@ -10,7 +10,7 @@ const UNARY_OPERATOR_PATTERN: &str = r"--|[\-~]";
 const DELIMITER_PATTERN: &str = r"[\(\);\{\}]";
 
 #[derive(Debug, PartialEq, Clone)]
-struct Match(Option<tokens::Token>, usize);
+struct Match(Option<Token>, usize);
 
 impl Default for Match {
     fn default() -> Self {
@@ -19,7 +19,7 @@ impl Default for Match {
 }
 
 impl Match {
-    fn new(token: tokens::Token, length: usize) -> Self {
+    fn new(token: Token, length: usize) -> Self {
         Match(Some(token), length)
     }
     fn size(&self) -> usize {
@@ -40,10 +40,10 @@ fn match_prefix<'a>(s: &'a str, pattern: &str) -> Result<Option<&'a str>, String
 fn match_word(s: &str) -> Result<Match, String> {
     if let Some(candidate) = match_prefix(s, KEYWORD_PATTERN)? {
         let kw = tokens::Keyword::from_str(candidate)?;
-        Ok(Match::new(tokens::Token::KEYWORD(kw), candidate.len()))
+        Ok(Match::new(Token::KEYWORD(kw), candidate.len()))
     } else if let Some(candidate) = match_prefix(s, IDENTIFIER_PATTERN)? {
         let iden = String::from(candidate);
-        Ok(Match::new(tokens::Token::IDENTIFIER(iden), candidate.len()))
+        Ok(Match::new(Token::IDENTIFIER(iden), candidate.len()))
     } else {
         Ok(Match::default())
     }
@@ -55,7 +55,7 @@ fn match_constant(s: &str) -> Result<Match, String> {
         let value: i64 = candidate
             .parse()
             .map_err(|e| format!("Failed to parse constant '{candidate}': {e}"))?;
-        Ok(Match::new(tokens::Token::CONSTANT(value), candidate.len()))
+        Ok(Match::new(Token::CONSTANT(value), candidate.len()))
     } else {
         Ok(Match::default())
     }
@@ -65,7 +65,7 @@ fn match_constant(s: &str) -> Result<Match, String> {
 fn match_operator(s: &str) -> Result<Match, String> {
     if let Some(candidate) = match_prefix(s, UNARY_OPERATOR_PATTERN)? {
         let op = tokens::Operator::from_str(candidate)?;
-        Ok(Match::new(tokens::Token::OPERATOR(op), candidate.len()))
+        Ok(Match::new(Token::OPERATOR(op), candidate.len()))
     } else {
         Ok(Match::default())
     }
@@ -75,7 +75,7 @@ fn match_operator(s: &str) -> Result<Match, String> {
 fn match_delimiter(s: &str) -> Result<Match, String> {
     if let Some(candidate) = match_prefix(s, DELIMITER_PATTERN)? {
         let delim = tokens::Delimiter::from_str(candidate)?;
-        Ok(Match::new(tokens::Token::DELIMITER(delim), candidate.len()))
+        Ok(Match::new(Token::DELIMITER(delim), candidate.len()))
     } else {
         Ok(Match::default())
     }
@@ -100,7 +100,7 @@ fn tokenize(s: &str) -> Result<Match, String> {
 }
 
 /// Lex the input C source code into a vector of tokens.
-pub fn lex(input: &str) -> Result<Vec<tokens::Token>, String> {
+pub fn lex(input: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
     let mut i = 0;
 
@@ -119,6 +119,5 @@ pub fn lex(input: &str) -> Result<Vec<tokens::Token>, String> {
             };
         };
     }
-    info!("Tokenization completed successfully");
     Ok(tokens)
 }
