@@ -2,7 +2,7 @@ use super::parser;
 use nanoid::nanoid;
 use std::fmt;
 
-enum UnaryOperator {
+pub enum UnaryOperator {
     COMPLEMENT,
     NEGATE,
 }
@@ -25,23 +25,23 @@ impl From<parser::UnaryOperator> for UnaryOperator {
     }
 }
 
-enum Value {
+pub enum Operand {
     CONSTANT(i64),
     VARIABLE(String),
 }
 
-impl fmt::Display for Value {
+impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::CONSTANT(c) => write!(f, "{}", c),
-            Value::VARIABLE(v) => write!(f, "{}", v),
+            Operand::CONSTANT(c) => write!(f, "{}", c),
+            Operand::VARIABLE(v) => write!(f, "{}", v),
         }
     }
 }
 
-enum Instruction {
-    RETURN(Value),
-    UNARY(UnaryOperator, Value, Value),
+pub enum Instruction {
+    RETURN(Operand),
+    UNARY(UnaryOperator, Operand, Operand),
 }
 
 impl fmt::Display for Instruction {
@@ -56,23 +56,23 @@ impl fmt::Display for Instruction {
 fn generate_instructions(
     expression: parser::Expression,
     instructions: &mut Vec<Instruction>,
-) -> Value {
+) -> Operand {
     match expression {
-        parser::Expression::INT(n) => Value::CONSTANT(n.into()),
+        parser::Expression::INT(n) => Operand::CONSTANT(n.into()),
         parser::Expression::UNARY(op, exp) => {
             let src = generate_instructions(*exp, instructions);
             let dst = format!("temp.{}", nanoid!(21));
             instructions.push(Instruction::UNARY(
                 UnaryOperator::from(op),
                 src,
-                Value::VARIABLE(String::from(&dst)),
+                Operand::VARIABLE(String::from(&dst)),
             ));
-            Value::VARIABLE(dst)
+            Operand::VARIABLE(dst)
         }
     }
 }
 
-struct Function(String, Vec<Instruction>);
+pub struct Function(String, Vec<Instruction>);
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -81,6 +81,18 @@ impl fmt::Display for Function {
             writeln!(f, "  {}", instr)?;
         }
         writeln!(f, "END FUNCTION")
+    }
+}
+
+impl AsRef<str> for Function {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<Function> for Vec<Instruction> {
+    fn from(function: Function) -> Self {
+        function.1
     }
 }
 
@@ -95,6 +107,12 @@ impl From<parser::Function> for Function {
             }
         };
         Function(name, instructions)
+    }
+}
+
+impl From<Program> for Function {
+    fn from(program: Program) -> Self {
+        program.0
     }
 }
 
