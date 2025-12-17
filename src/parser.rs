@@ -54,16 +54,16 @@ impl AsRef<str> for Identifier {
 
 /// Represents unary operators in the AST.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum UnaryOp {
-    NEGATION,
-    BITWISENOT,
+pub enum UnaryOperator {
+    NEGATE,
+    COMPLEMENT,
 }
 
-impl fmt::Display for UnaryOp {
+impl fmt::Display for UnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnaryOp::NEGATION => write!(f, "-"),
-            UnaryOp::BITWISENOT => write!(f, "~"),
+            UnaryOperator::NEGATE => write!(f, "-"),
+            UnaryOperator::COMPLEMENT => write!(f, "~"),
         }
     }
 }
@@ -72,7 +72,7 @@ impl fmt::Display for UnaryOp {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     INT(Integer),
-    UNARY(UnaryOp, Box<Expression>),
+    UNARY(UnaryOperator, Box<Expression>),
 }
 
 impl fmt::Display for Expression {
@@ -157,8 +157,8 @@ fn parse_expression(tokens: &mut VecDeque<Token>) -> Result<Expression, String> 
         Some(Token::OPERATOR(op)) => {
             let expr = parse_expression(tokens)?;
             let op = match op {
-                tokens::Operator::NEGATION => Ok(UnaryOp::NEGATION),
-                tokens::Operator::BITWISENOT => Ok(UnaryOp::BITWISENOT),
+                tokens::Operator::NEGATION => Ok(UnaryOperator::NEGATE),
+                tokens::Operator::BITWISENOT => Ok(UnaryOperator::COMPLEMENT),
                 tokens::Operator::DECREMENT => {
                     Err(String::from("Decrement operator not implemented"))
                 }

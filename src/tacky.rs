@@ -2,25 +2,25 @@ use super::parser;
 use nanoid::nanoid;
 use std::fmt;
 
-enum UnaryOp {
+enum UnaryOperator {
     COMPLEMENT,
-    NEGATION,
+    NEGATE,
 }
 
-impl fmt::Display for UnaryOp {
+impl fmt::Display for UnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnaryOp::COMPLEMENT => write!(f, "~"),
-            UnaryOp::NEGATION => write!(f, "-"),
+            UnaryOperator::COMPLEMENT => write!(f, "~"),
+            UnaryOperator::NEGATE => write!(f, "-"),
         }
     }
 }
 
-impl From<parser::UnaryOp> for UnaryOp {
-    fn from(op: parser::UnaryOp) -> Self {
+impl From<parser::UnaryOperator> for UnaryOperator {
+    fn from(op: parser::UnaryOperator) -> Self {
         match op {
-            parser::UnaryOp::BITWISENOT => UnaryOp::COMPLEMENT,
-            parser::UnaryOp::NEGATION => UnaryOp::NEGATION,
+            parser::UnaryOperator::COMPLEMENT => UnaryOperator::COMPLEMENT,
+            parser::UnaryOperator::NEGATE => UnaryOperator::NEGATE,
         }
     }
 }
@@ -41,7 +41,7 @@ impl fmt::Display for Value {
 
 enum Instruction {
     RETURN(Value),
-    UNARY(UnaryOp, Value, Value),
+    UNARY(UnaryOperator, Value, Value),
 }
 
 impl fmt::Display for Instruction {
@@ -63,7 +63,7 @@ fn generate_instructions(
             let src = generate_instructions(*exp, instructions);
             let dst = format!("temp.{}", nanoid!(21));
             instructions.push(Instruction::UNARY(
-                UnaryOp::from(op),
+                UnaryOperator::from(op),
                 src,
                 Value::VARIABLE(String::from(&dst)),
             ));
