@@ -104,7 +104,7 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
     let mut i = 0;
 
-    info!("Tokenizing input...");
+    info!("Lexing/tokenizing input...");
     while i < input.len() {
         while i < input.len() && input[i..].starts_with(char::is_whitespace) {
             i += 1;

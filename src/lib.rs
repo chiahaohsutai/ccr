@@ -5,6 +5,7 @@ use tracing::info;
 pub mod assembly;
 pub mod lexer;
 pub mod parser;
+pub mod tacky;
 pub mod tokens;
 
 /// Preprocess the .c file into a .i file.
@@ -78,7 +79,7 @@ fn compile(input: &Path, stop_after: Option<CompileStep>) -> Result<Option<Named
         return Ok(None);
     };
 
-    // let tacky = parser::to_tacky(&program?);
+    let _ = tacky::Program::from(program.clone());
     if matches!(stop_after, Some(CompileStep::TACKY)) {
         return Ok(None);
     }

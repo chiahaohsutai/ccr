@@ -1,4 +1,5 @@
 use super::tokens::{self, Token};
+use core::fmt;
 use std::collections::VecDeque;
 use std::str::FromStr;
 use tracing::info;
@@ -6,6 +7,12 @@ use tracing::info;
 /// Represents an integer constant in the AST.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Integer(i64);
+
+impl fmt::Display for Integer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl FromStr for Integer {
     type Err = String;
@@ -27,6 +34,12 @@ impl From<Integer> for i64 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Identifier(String);
 
+impl fmt::Display for Identifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl From<&str> for Identifier {
     fn from(name: &str) -> Self {
         Identifier(String::from(name))
@@ -46,11 +59,29 @@ pub enum UnaryOp {
     BITWISENOT,
 }
 
+impl fmt::Display for UnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnaryOp::NEGATION => write!(f, "-"),
+            UnaryOp::BITWISENOT => write!(f, "~"),
+        }
+    }
+}
+
 /// Represents an expression in the AST.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     INT(Integer),
     UNARY(UnaryOp, Box<Expression>),
+}
+
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expression::INT(n) => write!(f, "{}", n),
+            Expression::UNARY(op, expr) => write!(f, "{}{}", op, expr),
+        }
+    }
 }
 
 impl From<i64> for Expression {
@@ -63,6 +94,14 @@ impl From<i64> for Expression {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     RETURN(Expression),
+}
+
+impl fmt::Display for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Statement::RETURN(expr) => write!(f, "RETURN {};", expr),
+        }
+    }
 }
 
 impl From<Function> for Statement {
@@ -79,8 +118,19 @@ impl Function {
     pub fn new(name: Identifier, body: Statement) -> Self {
         Function(name, body)
     }
-    pub fn name(&self) -> &Identifier {
-        &self.0
+}
+
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "FUNCTION {}", self.0)?;
+        writeln!(f, "  {}", self.1)?;
+        writeln!(f, "END FUNCTION")
+    }
+}
+
+impl AsRef<str> for Function {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
     }
 }
 
@@ -93,6 +143,12 @@ impl From<Program> for Function {
 /// Represents a complete program in the AST.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program(Function);
+
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// Parses expression production rule.
 fn parse_expression(tokens: &mut VecDeque<Token>) -> Result<Expression, String> {

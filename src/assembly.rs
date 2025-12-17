@@ -72,7 +72,7 @@ impl From<parser::Function> for Function {
     fn from(function: parser::Function) -> Self {
         let mut instructions: Vec<Instruction> = Vec::new();
 
-        let name = String::from(function.name().as_ref());
+        let name = String::from(function.as_ref());
         let stmt = parser::Statement::from(function);
 
         match stmt {
