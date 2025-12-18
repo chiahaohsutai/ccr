@@ -6,7 +6,7 @@ use tracing::info;
 
 /// Represents an integer constant in the AST.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Integer(i64);
+pub struct Integer(u64);
 
 impl fmt::Display for Integer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -18,13 +18,13 @@ impl FromStr for Integer {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse::<i64>()
+        s.parse::<u64>()
             .map(Integer)
             .map_err(|e| format!("Failed to parse integer '{}': {}", s, e))
     }
 }
 
-impl From<Integer> for i64 {
+impl From<Integer> for u64 {
     fn from(integer: Integer) -> Self {
         integer.0
     }
@@ -68,25 +68,107 @@ impl fmt::Display for UnaryOperator {
     }
 }
 
+impl TryFrom<tokens::Operator> for UnaryOperator {
+    type Error = String;
+
+    fn try_from(op: tokens::Operator) -> Result<Self, Self::Error> {
+        match op {
+            tokens::Operator::NEGATION => Ok(UnaryOperator::NEGATE),
+            tokens::Operator::COMPLEMENT => Ok(UnaryOperator::COMPLEMENT),
+            _ => Err(format!("Operator '{}' is not a unary operator.", op)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum BinaryOperator {
+    ADD,
+    SUBTRACT,
+    MULTIPLY,
+    DIVIDE,
+    REMAINDER,
+}
+
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinaryOperator::ADD => write!(f, "+"),
+            BinaryOperator::SUBTRACT => write!(f, "-"),
+            BinaryOperator::MULTIPLY => write!(f, "*"),
+            BinaryOperator::DIVIDE => write!(f, "/"),
+            BinaryOperator::REMAINDER => write!(f, "%"),
+        }
+    }
+}
+
+impl TryFrom<tokens::Operator> for BinaryOperator {
+    type Error = String;
+
+    fn try_from(op: tokens::Operator) -> Result<Self, Self::Error> {
+        match op {
+            tokens::Operator::ADDITION => Ok(BinaryOperator::ADD),
+            tokens::Operator::NEGATION => Ok(BinaryOperator::SUBTRACT),
+            tokens::Operator::PRODUCT => Ok(BinaryOperator::MULTIPLY),
+            tokens::Operator::DIVISION => Ok(BinaryOperator::DIVIDE),
+            tokens::Operator::REMAINDER => Ok(BinaryOperator::REMAINDER),
+            _ => Err(format!("Operator '{}' is not a binary operator.", op)),
+        }
+    }
+}
+
+impl TryFrom<Token> for BinaryOperator {
+    type Error = String;
+
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        match token {
+            Token::OPERATOR(op) => BinaryOperator::try_from(op),
+            _ => Err(String::from("Token is not an operator.")),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Factor {
+    INT(Integer),
+    UNARY(UnaryOperator, Box<Factor>),
+    EXPRESSION(Box<Expression>),
+}
+
+impl fmt::Display for Factor {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Factor::INT(n) => write!(f, "{}", n),
+            Factor::UNARY(op, factor) => write!(f, "{}{}", op, factor),
+            Factor::EXPRESSION(expr) => write!(f, "({})", expr),
+        }
+    }
+}
+
+impl From<u64> for Factor {
+    fn from(value: u64) -> Self {
+        Factor::INT(Integer(value))
+    }
+}
+
 /// Represents an expression in the AST.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
-    INT(Integer),
-    UNARY(UnaryOperator, Box<Expression>),
+    FACTOR(Factor),
+    BINARY(Box<Expression>, BinaryOperator, Box<Expression>),
 }
 
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::INT(n) => write!(f, "{}", n),
-            Expression::UNARY(op, expr) => write!(f, "{}{}", op, expr),
+            Expression::FACTOR(factor) => write!(f, "{}", factor),
+            Expression::BINARY(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
         }
     }
 }
 
-impl From<i64> for Expression {
-    fn from(value: i64) -> Self {
-        Expression::INT(Integer(value))
+impl From<u64> for Expression {
+    fn from(value: u64) -> Self {
+        Expression::FACTOR(Factor::from(value))
     }
 }
 
@@ -125,9 +207,7 @@ impl Function {
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "FUNCTION {}", self.0)?;
-        writeln!(f, "  {}", self.1)?;
-        writeln!(f, "END FUNCTION")
+        writeln!(f, "FUNCTION {}\n\t{}\nEND FUNCTION", self.0, self.1)
     }
 }
 
@@ -147,37 +227,63 @@ impl fmt::Display for Program {
     }
 }
 
-/// Parses expression production rule.
-fn parse_expression(tokens: &mut VecDeque<Token>) -> Result<Expression, String> {
+fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Factor, String> {
     match tokens.pop_front() {
-        Some(Token::CONSTANT(n)) => Ok(Expression::from(n)),
-        Some(Token::OPERATOR(op)) => {
-            let expr = parse_expression(tokens)?;
-            let op = match op {
-                tokens::Operator::NEGATION => Ok(UnaryOperator::NEGATE),
-                tokens::Operator::BITWISENOT => Ok(UnaryOperator::COMPLEMENT),
-                tokens::Operator::DECREMENT => {
-                    Err(String::from("Decrement operator not implemented"))
-                }
-            };
-            Ok(Expression::UNARY(op?, Box::new(expr)))
-        }
+        Some(Token::CONSTANT(value)) => Ok(Factor::from(value)),
+        Some(Token::OPERATOR(op)) => match op {
+            tokens::Operator::NEGATION => {
+                let factor = parse_factor(tokens)?;
+                Ok(Factor::UNARY(UnaryOperator::NEGATE, Box::new(factor)))
+            }
+            tokens::Operator::COMPLEMENT => {
+                let factor = parse_factor(tokens)?;
+                Ok(Factor::UNARY(UnaryOperator::COMPLEMENT, Box::new(factor)))
+            }
+            _ => Err(format!("Unexpected operator '{}' in factor.", op)),
+        },
         Some(Token::DELIMITER(tokens::Delimiter::LPAREN)) => {
-            let expr = parse_expression(tokens);
-            match tokens.pop_front() {
-                Some(Token::DELIMITER(tokens::Delimiter::RPAREN)) => expr,
-                _ => Err(String::from("Expected ')' after expression.")),
+            let expr = parse_expression(tokens, 0)?;
+            if let Some(Token::DELIMITER(tokens::Delimiter::RPAREN)) = tokens.pop_front() {
+                Ok(Factor::EXPRESSION(Box::new(expr)))
+            } else {
+                Err(String::from("Expected ')' after expression."))
             }
         }
-        _ => Err(String::from("Malformed expression.")),
+        _ => Err(String::from("Malformed factor.")),
     }
+}
+
+/// Parses expression production rule.
+fn parse_expression(tokens: &mut VecDeque<Token>, precedence: u64) -> Result<Expression, String> {
+    let mut left = Expression::FACTOR(parse_factor(tokens)?);
+    let mut next = tokens.pop_front();
+
+    while next
+        .as_ref()
+        .is_some_and(|token| token.is_binary_operator() && token.precedence() >= precedence)
+    {
+        let token = next.unwrap();
+        let precedence = token.precedence() + 1;
+        let right = parse_expression(tokens, precedence)?;
+        left = Expression::BINARY(
+            Box::new(left),
+            BinaryOperator::try_from(token).unwrap(),
+            Box::new(right),
+        );
+        next = tokens.pop_front();
+    }
+
+    if let Some(t) = next {
+        tokens.push_front(t);
+    }
+    Ok(left)
 }
 
 /// Parses statement production rule.
 fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement, String> {
     match tokens.pop_front() {
         Some(Token::KEYWORD(tokens::Keyword::RETURN)) => {
-            let expr = parse_expression(tokens)?;
+            let expr = parse_expression(tokens, 0)?;
             match tokens.pop_front() {
                 Some(Token::DELIMITER(tokens::Delimiter::SEMICOLON)) => Ok(Statement::RETURN(expr)),
                 _ => Err(String::from("Expected ';' after return expression.")),
