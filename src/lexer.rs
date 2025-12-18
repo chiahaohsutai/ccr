@@ -6,7 +6,7 @@ use tracing::info;
 const IDENTIFIER_PATTERN: &str = r"[a-zA-Z]\w*\b";
 const CONSTANT_PATTERN: &str = r"[0-9]+\b";
 const KEYWORD_PATTERN: &str = r"int|void|return\b";
-const UNARY_OPERATOR_PATTERN: &str = r"--|[\-~]";
+const OPERATOR_PATTERN: &str = r"--|[\-~\+\*/%]";
 const DELIMITER_PATTERN: &str = r"[\(\);\{\}]";
 
 #[derive(Debug, PartialEq, Clone)]
@@ -52,7 +52,7 @@ fn match_word(s: &str) -> Result<Match, String> {
 /// Match a constant at the start of parameter parameter `s`.
 fn match_constant(s: &str) -> Result<Match, String> {
     if let Some(candidate) = match_prefix(s, CONSTANT_PATTERN)? {
-        let value: i64 = candidate
+        let value: u64 = candidate
             .parse()
             .map_err(|e| format!("Failed to parse constant '{candidate}': {e}"))?;
         Ok(Match::new(Token::CONSTANT(value), candidate.len()))
@@ -63,7 +63,7 @@ fn match_constant(s: &str) -> Result<Match, String> {
 
 /// Match a unary operator at the start of parameter `s`.
 fn match_operator(s: &str) -> Result<Match, String> {
-    if let Some(candidate) = match_prefix(s, UNARY_OPERATOR_PATTERN)? {
+    if let Some(candidate) = match_prefix(s, OPERATOR_PATTERN)? {
         let op = tokens::Operator::from_str(candidate)?;
         Ok(Match::new(Token::OPERATOR(op), candidate.len()))
     } else {

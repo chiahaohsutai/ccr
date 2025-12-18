@@ -5,7 +5,11 @@ use std::str::FromStr;
 pub enum Operator {
     DECREMENT,
     NEGATION,
-    BITWISENOT,
+    COMPLEMENT,
+    ADDITION,
+    PRODUCT,
+    DIVISION,
+    REMAINDER,
 }
 
 impl FromStr for Operator {
@@ -15,7 +19,11 @@ impl FromStr for Operator {
         match s {
             "--" => Ok(Operator::DECREMENT),
             "-" => Ok(Operator::NEGATION),
-            "~" => Ok(Operator::BITWISENOT),
+            "~" => Ok(Operator::COMPLEMENT),
+            "+" => Ok(Operator::ADDITION),
+            "*" => Ok(Operator::PRODUCT),
+            "/" => Ok(Operator::DIVISION),
+            "%" => Ok(Operator::REMAINDER),
             _ => Err(format!("Unknown operator: {}", s)),
         }
     }
@@ -26,7 +34,11 @@ impl fmt::Display for Operator {
         match self {
             Operator::DECREMENT => write!(f, "--"),
             Operator::NEGATION => write!(f, "-"),
-            Operator::BITWISENOT => write!(f, "~"),
+            Operator::COMPLEMENT => write!(f, "~"),
+            Operator::ADDITION => write!(f, "+"),
+            Operator::PRODUCT => write!(f, "*"),
+            Operator::DIVISION => write!(f, "/"),
+            Operator::REMAINDER => write!(f, "%"),
         }
     }
 }
@@ -100,7 +112,7 @@ impl fmt::Display for Delimiter {
 /// Tokens in C source code.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    CONSTANT(i64),
+    CONSTANT(u64),
     KEYWORD(Keyword),
     IDENTIFIER(String),
     OPERATOR(Operator),
@@ -115,6 +127,29 @@ impl fmt::Display for Token {
             Token::IDENTIFIER(name) => write!(f, "{}", name),
             Token::OPERATOR(op) => write!(f, "{}", op),
             Token::DELIMITER(delim) => write!(f, "{}", delim),
+        }
+    }
+}
+
+impl Token {
+    pub fn is_binary_operator(&self) -> bool {
+        matches!(
+            self,
+            Token::OPERATOR(Operator::ADDITION)
+                | Token::OPERATOR(Operator::PRODUCT)
+                | Token::OPERATOR(Operator::DIVISION)
+                | Token::OPERATOR(Operator::REMAINDER)
+                | Token::OPERATOR(Operator::NEGATION)
+        )
+    }
+    pub fn precedence(&self) -> u64 {
+        match self {
+            Self::OPERATOR(Operator::ADDITION) => 45,
+            Self::OPERATOR(Operator::NEGATION) => 45,
+            Self::OPERATOR(Operator::PRODUCT) => 50,
+            Self::OPERATOR(Operator::DIVISION) => 50,
+            Self::OPERATOR(Operator::REMAINDER) => 50,
+            _ => 0,
         }
     }
 }
