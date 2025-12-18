@@ -72,6 +72,9 @@ impl StackOffsets {
             self.current_offset
         }
     }
+    fn size(&self) -> i64 {
+        -self.current_offset
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,7 +83,9 @@ struct Function(String, Vec<Instruction>);
 impl From<tacky::Function> for Function {
     fn from(func: tacky::Function) -> Self {
         let name = String::from(func.as_ref());
+
         let mut instructions: Vec<Instruction> = Vec::new();
+        instructions.push(Instruction::AllocateStack(0));
 
         Vec::from(func)
             .into_iter()
@@ -100,22 +105,45 @@ impl From<tacky::Function> for Function {
             });
 
         let mut offsets = StackOffsets::default();
-        let instructions = instructions
+        let mut instructions = instructions
             .into_iter()
             .map(|instruction| match instruction {
+                Instruction::Mov(Operand::PSEUDO(n1), Operand::PSEUDO(n2)) => {
+                    let offset1 = offsets.get(&n1);
+                    let offset2 = offsets.get(&n2);
+                    Instruction::Mov(Operand::STACK(offset1), Operand::STACK(offset2))
+                }
                 Instruction::Mov(op, Operand::PSEUDO(n)) => {
-                    let offset = offsets.get(&n);
-                    Instruction::Mov(op, Operand::STACK(offset))
+                    Instruction::Mov(op, Operand::STACK(offsets.get(&n)))
                 }
                 Instruction::Unary(op, Operand::PSEUDO(name)) => {
-                    let offset = offsets.get(&name);
-                    Instruction::Unary(op, Operand::STACK(offset))
+                    Instruction::Unary(op, Operand::STACK(offsets.get(&name)))
                 }
                 _ => instruction,
             })
             .collect::<Vec<Instruction>>();
 
-        Function(name, instructions)
+        let size = offsets.size();
+        instructions[0] = Instruction::AllocateStack(size);
+
+        let mut final_instructions: Vec<Instruction> = Vec::new();
+        instructions
+            .into_iter()
+            .for_each(|instruction| match instruction {
+                Instruction::Mov(Operand::STACK(n1), Operand::STACK(n2)) => {
+                    final_instructions.push(Instruction::Mov(
+                        Operand::STACK(n1),
+                        Operand::REG(Register::R10),
+                    ));
+                    final_instructions.push(Instruction::Mov(
+                        Operand::REG(Register::R10),
+                        Operand::STACK(n2),
+                    ));
+                }
+                _ => final_instructions.push(instruction),
+            });
+
+        Function(name, final_instructions)
     }
 }
 
