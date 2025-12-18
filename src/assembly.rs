@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::tacky;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -46,6 +48,32 @@ enum Instruction {
     Ret,
 }
 
+struct StackOffsets {
+    offsets: HashMap<String, i64>,
+    current_offset: i64,
+}
+
+impl Default for StackOffsets {
+    fn default() -> Self {
+        StackOffsets {
+            offsets: HashMap::new(),
+            current_offset: 0,
+        }
+    }
+}
+
+impl StackOffsets {
+    fn get(&mut self, name: &str) -> i64 {
+        if let Some(offset) = self.offsets.get(name) {
+            *offset
+        } else {
+            self.current_offset -= 4;
+            self.offsets.insert(String::from(name), self.current_offset);
+            self.current_offset
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Function(String, Vec<Instruction>);
 
@@ -70,6 +98,23 @@ impl From<tacky::Function> for Function {
                     instructions.push(Instruction::Unary(operator, destination));
                 }
             });
+
+        let mut offsets = StackOffsets::default();
+        let instructions = instructions
+            .into_iter()
+            .map(|instruction| match instruction {
+                Instruction::Mov(op, Operand::PSEUDO(n)) => {
+                    let offset = offsets.get(&n);
+                    Instruction::Mov(op, Operand::STACK(offset))
+                }
+                Instruction::Unary(op, Operand::PSEUDO(name)) => {
+                    let offset = offsets.get(&name);
+                    Instruction::Unary(op, Operand::STACK(offset))
+                }
+                _ => instruction,
+            })
+            .collect::<Vec<Instruction>>();
+
         Function(name, instructions)
     }
 }
