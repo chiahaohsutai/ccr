@@ -1,3 +1,4 @@
+use core::fmt;
 use std::collections::HashMap;
 
 use super::tacky;
@@ -148,11 +149,17 @@ impl From<tacky::Function> for Function {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct Program(Function);
+pub struct Program(Function);
 
 impl From<tacky::Program> for Program {
     fn from(program: tacky::Program) -> Self {
         let function = tacky::Function::from(program);
         Program(Function::from(function))
+    }
+}
+
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!();
     }
 }

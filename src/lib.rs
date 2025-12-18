@@ -79,7 +79,7 @@ fn compile(input: &Path, stop_after: Option<CompileStep>) -> Result<Option<Named
         return Ok(None);
     };
 
-    let _ = tacky::Program::from(program.clone());
+    let program = tacky::Program::from(program.clone());
     if matches!(stop_after, Some(CompileStep::TACKY)) {
         return Ok(None);
     }
