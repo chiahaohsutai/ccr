@@ -81,7 +81,7 @@ impl TryFrom<tokens::Operator> for UnaryOperator {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum BinaryOperator {
+pub enum BinaryOperator {
     ADD,
     SUBTRACT,
     MULTIPLY,

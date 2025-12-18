@@ -2,6 +2,7 @@ use super::parser;
 use nanoid::nanoid;
 use std::fmt;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
     COMPLEMENT,
     NEGATE,
@@ -25,8 +26,41 @@ impl From<parser::UnaryOperator> for UnaryOperator {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BinaryOperator {
+    ADD,
+    SUBTRACT,
+    MULTIPLY,
+    DIVIDE,
+    REMAINDER,
+}
+
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinaryOperator::ADD => write!(f, "+"),
+            BinaryOperator::SUBTRACT => write!(f, "-"),
+            BinaryOperator::MULTIPLY => write!(f, "*"),
+            BinaryOperator::DIVIDE => write!(f, "/"),
+            BinaryOperator::REMAINDER => write!(f, "%"),
+        }
+    }
+}
+
+impl From<parser::BinaryOperator> for BinaryOperator {
+    fn from(op: parser::BinaryOperator) -> Self {
+        match op {
+            parser::BinaryOperator::ADD => BinaryOperator::ADD,
+            parser::BinaryOperator::SUBTRACT => BinaryOperator::SUBTRACT,
+            parser::BinaryOperator::MULTIPLY => BinaryOperator::MULTIPLY,
+            parser::BinaryOperator::DIVIDE => BinaryOperator::DIVIDE,
+            parser::BinaryOperator::REMAINDER => BinaryOperator::REMAINDER,
+        }
+    }
+}
+
 pub enum Operand {
-    CONSTANT(i64),
+    CONSTANT(u64),
     VARIABLE(String),
 }
 
@@ -42,6 +76,7 @@ impl fmt::Display for Operand {
 pub enum Instruction {
     RETURN(Operand),
     UNARY(UnaryOperator, Operand, Operand),
+    BINARY(BinaryOperator, Operand, Operand, Operand),
 }
 
 impl fmt::Display for Instruction {
@@ -49,6 +84,7 @@ impl fmt::Display for Instruction {
         match self {
             Instruction::RETURN(v) => write!(f, "RETURN {}", v),
             Instruction::UNARY(op, src, dest) => write!(f, "{} {} {}", op, src, dest),
+            Instruction::BINARY(op, l, r, dest) => write!(f, "{} {} {} {}", op, l, r, dest),
         }
     }
 }
@@ -58,13 +94,28 @@ fn generate_instructions(
     instructions: &mut Vec<Instruction>,
 ) -> Operand {
     match expression {
-        parser::Expression::INT(n) => Operand::CONSTANT(n.into()),
-        parser::Expression::UNARY(op, exp) => {
-            let src = generate_instructions(*exp, instructions);
+        parser::Expression::FACTOR(factor) => match factor {
+            parser::Factor::INT(n) => Operand::CONSTANT(n.into()),
+            parser::Factor::UNARY(op, exp) => {
+                let src = generate_instructions(parser::Expression::FACTOR(*exp), instructions);
+                let dst = format!("temp.{}", nanoid!(21));
+                instructions.push(Instruction::UNARY(
+                    UnaryOperator::from(op),
+                    src,
+                    Operand::VARIABLE(String::from(&dst)),
+                ));
+                Operand::VARIABLE(dst)
+            }
+            parser::Factor::EXPRESSION(expr) => generate_instructions(*expr, instructions),
+        },
+        parser::Expression::BINARY(lhs, op, rhs) => {
+            let left = generate_instructions(*lhs, instructions);
+            let right = generate_instructions(*rhs, instructions);
             let dst = format!("temp.{}", nanoid!(21));
-            instructions.push(Instruction::UNARY(
-                UnaryOperator::from(op),
-                src,
+            instructions.push(Instruction::BINARY(
+                BinaryOperator::from(op),
+                left,
+                right,
                 Operand::VARIABLE(String::from(&dst)),
             ));
             Operand::VARIABLE(dst)
