@@ -17,6 +17,20 @@ enum Operand {
     STACK(i64),
 }
 
+impl fmt::Display for Operand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Operand::IMM(c) => write!(f, "${c}"),
+            Operand::REG(r) => match r {
+                Register::AX => write!(f, "%eax"),
+                Register::R10 => write!(f, "%r10d"),
+            },
+            Operand::PSEUDO(name) => panic!("Unexpected pseudo operand: {}", name),
+            Operand::STACK(offset) => write!(f, "{}(%rbp)", offset),
+        }
+    }
+}
+
 impl From<tacky::Operand> for Operand {
     fn from(operand: tacky::Operand) -> Self {
         match operand {
@@ -30,6 +44,15 @@ impl From<tacky::Operand> for Operand {
 enum UnaryOperator {
     NEG,
     NOT,
+}
+
+impl fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UnaryOperator::NEG => write!(f, "negl"),
+            UnaryOperator::NOT => write!(f, "notl"),
+        }
+    }
 }
 
 impl From<tacky::UnaryOperator> for UnaryOperator {
@@ -47,6 +70,17 @@ enum Instruction {
     Unary(UnaryOperator, Operand),
     AllocateStack(i64),
     Ret,
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Instruction::Mov(src, dest) => write!(f, "\tmovl {src}, {dest}"),
+            Instruction::AllocateStack(size) => write!(f, "\tsubq ${size}, %rsp"),
+            Instruction::Unary(op, operand) => write!(f, "\t{op} {operand}"),
+            Instruction::Ret => write!(f, "\tmovq %rbp, %rsp\n\tpopq %rbp\n\tret"),
+        }
+    }
 }
 
 struct StackOffsets {
@@ -81,9 +115,25 @@ impl StackOffsets {
 #[derive(Debug, Clone, PartialEq)]
 struct Function(String, Vec<Instruction>);
 
+impl fmt::Display for Function {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let lines: Vec<String> = vec![
+            format!("\t.globl _{}", self.0),
+            format!("_{}:", self.0),
+            String::from("\tpushq %rbp"),
+            String::from("\tmovq %rsp, %rbp"),
+        ];
+        let lines = self.1.iter().fold(lines, |mut acc, instruction| {
+            acc.push(instruction.to_string());
+            acc
+        });
+        write!(f, "{}", lines.join("\n"))
+    }
+}
+
 impl From<tacky::Function> for Function {
     fn from(func: tacky::Function) -> Self {
-        let name = String::from(func.as_ref());
+        let name = String::from(func.name());
 
         let mut instructions: Vec<Instruction> = Vec::new();
         instructions.push(Instruction::AllocateStack(0));
@@ -116,6 +166,9 @@ impl From<tacky::Function> for Function {
                 }
                 Instruction::Mov(op, Operand::PSEUDO(n)) => {
                     Instruction::Mov(op, Operand::STACK(offsets.get(&n)))
+                }
+                Instruction::Mov(Operand::PSEUDO(n), op) => {
+                    Instruction::Mov(Operand::STACK(offsets.get(&n)), op)
                 }
                 Instruction::Unary(op, Operand::PSEUDO(name)) => {
                     Instruction::Unary(op, Operand::STACK(offsets.get(&name)))
@@ -160,6 +213,6 @@ impl From<tacky::Program> for Program {
 
 impl fmt::Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!();
+        write!(f, "{}", self.0)
     }
 }

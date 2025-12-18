@@ -74,6 +74,12 @@ fn generate_instructions(
 
 pub struct Function(String, Vec<Instruction>);
 
+impl Function {
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "FUNCTION {}", self.0)?;
@@ -81,12 +87,6 @@ impl fmt::Display for Function {
             writeln!(f, "  {}", instr)?;
         }
         writeln!(f, "END FUNCTION")
-    }
-}
-
-impl AsRef<str> for Function {
-    fn as_ref(&self) -> &str {
-        &self.0
     }
 }
 
@@ -98,7 +98,7 @@ impl From<Function> for Vec<Instruction> {
 
 impl From<parser::Function> for Function {
     fn from(function: parser::Function) -> Self {
-        let name = String::from(function.as_ref());
+        let name = String::from(function.name().as_ref());
         let mut instructions: Vec<Instruction> = Vec::new();
         match parser::Statement::from(function) {
             parser::Statement::RETURN(expr) => {

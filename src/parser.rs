@@ -118,6 +118,9 @@ impl Function {
     pub fn new(name: Identifier, body: Statement) -> Self {
         Function(name, body)
     }
+    pub fn name(&self) -> &Identifier {
+        &self.0
+    }
 }
 
 impl fmt::Display for Function {
@@ -125,12 +128,6 @@ impl fmt::Display for Function {
         writeln!(f, "FUNCTION {}", self.0)?;
         writeln!(f, "  {}", self.1)?;
         writeln!(f, "END FUNCTION")
-    }
-}
-
-impl AsRef<str> for Function {
-    fn as_ref(&self) -> &str {
-        self.0.as_ref()
     }
 }
 
