@@ -59,6 +59,7 @@ impl From<parser::BinaryOperator> for BinaryOperator {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Operand {
     CONSTANT(u64),
     VARIABLE(String),

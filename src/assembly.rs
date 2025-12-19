@@ -3,18 +3,22 @@ use std::collections::HashMap;
 
 use super::tacky;
 
+// Registers in x86-64 assembly.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Register {
     AX,
+    DX,
     R10,
+    R11,
 }
 
+// Operands in x86-64 assembly.
 #[derive(Debug, Clone, PartialEq)]
 enum Operand {
-    IMM(i64),
+    IMM(u64),
     REG(Register),
     PSEUDO(String),
-    STACK(i64),
+    STACK(u64),
 }
 
 impl fmt::Display for Operand {
@@ -24,9 +28,11 @@ impl fmt::Display for Operand {
             Operand::REG(r) => match r {
                 Register::AX => write!(f, "%eax"),
                 Register::R10 => write!(f, "%r10d"),
+                Register::DX => write!(f, "%edx"),
+                Register::R11 => write!(f, "%r11d"),
             },
             Operand::PSEUDO(name) => panic!("Unexpected pseudo operand: {}", name),
-            Operand::STACK(offset) => write!(f, "{}(%rbp)", offset),
+            Operand::STACK(offset) => write!(f, "-{}(%rbp)", offset),
         }
     }
 }
@@ -40,6 +46,7 @@ impl From<tacky::Operand> for Operand {
     }
 }
 
+// Unary operators in x86-64 assembly.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum UnaryOperator {
     NEG,
@@ -64,28 +71,49 @@ impl From<tacky::UnaryOperator> for UnaryOperator {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum BinaryOperator {
+    ADD,
+    SUB,
+    MUL,
+}
+
+// Instructions in x86-64 assembly.
 #[derive(Debug, Clone, PartialEq)]
 enum Instruction {
-    Mov(Operand, Operand),
-    Unary(UnaryOperator, Operand),
-    AllocateStack(i64),
-    Ret,
+    MOV(Operand, Operand),
+    UNARY(UnaryOperator, Operand),
+    BINARY(BinaryOperator, Operand, Operand),
+    IDIV(Operand),
+    CDQ,
+    ALLOCATE(u64),
+    RET,
 }
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Instruction::Mov(src, dest) => write!(f, "\tmovl {src}, {dest}"),
-            Instruction::AllocateStack(size) => write!(f, "\tsubq ${size}, %rsp"),
-            Instruction::Unary(op, operand) => write!(f, "\t{op} {operand}"),
-            Instruction::Ret => write!(f, "\tmovq %rbp, %rsp\n\tpopq %rbp\n\tret"),
+            Instruction::MOV(src, dest) => write!(f, "\tmovl {src}, {dest}"),
+            Instruction::ALLOCATE(size) => write!(f, "\tsubq ${size}, %rsp"),
+            Instruction::UNARY(op, operand) => write!(f, "\t{op} {operand}"),
+            Instruction::RET => write!(f, "\tmovq %rbp, %rsp\n\tpopq %rbp\n\tret"),
+            Instruction::CDQ => write!(f, "\tcdq"),
+            Instruction::IDIV(operand) => write!(f, "\tidivl {operand}"),
+            Instruction::BINARY(op, lhs, rhs) => {
+                let op_str = match op {
+                    BinaryOperator::ADD => "addl",
+                    BinaryOperator::SUB => "subl",
+                    BinaryOperator::MUL => "imull",
+                };
+                write!(f, "\t{} {}, {}", op_str, lhs, rhs)
+            }
         }
     }
 }
 
 struct StackOffsets {
-    offsets: HashMap<String, i64>,
-    current_offset: i64,
+    offsets: HashMap<String, u64>,
+    current_offset: u64,
 }
 
 impl Default for StackOffsets {
@@ -98,20 +126,21 @@ impl Default for StackOffsets {
 }
 
 impl StackOffsets {
-    fn get(&mut self, name: &str) -> i64 {
+    fn get(&mut self, name: &str) -> u64 {
         if let Some(offset) = self.offsets.get(name) {
             *offset
         } else {
-            self.current_offset -= 4;
+            self.current_offset += 4;
             self.offsets.insert(String::from(name), self.current_offset);
             self.current_offset
         }
     }
-    fn size(&self) -> i64 {
-        -self.current_offset
+    fn size(&self) -> u64 {
+        self.current_offset
     }
 }
 
+// Represents a function in x86-64 assembly.
 #[derive(Debug, Clone, PartialEq)]
 struct Function(String, Vec<Instruction>);
 
@@ -131,76 +160,192 @@ impl fmt::Display for Function {
     }
 }
 
+/// Generate pseudo-instructions for a given tacky instruction.
+fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruction> {
+    let mut instructions: Vec<Instruction> = Vec::new();
+    match instruction {
+        tacky::Instruction::RETURN(operand) => {
+            let op = Operand::from(operand);
+            instructions.push(Instruction::MOV(op, Operand::REG(Register::AX)));
+            instructions.push(Instruction::RET);
+        }
+        tacky::Instruction::UNARY(op, src, dest) => {
+            let operator = UnaryOperator::from(op);
+            let source = Operand::from(src);
+            let destination = Operand::from(dest);
+            instructions.push(Instruction::MOV(source, destination.clone()));
+            instructions.push(Instruction::UNARY(operator, destination));
+        }
+        tacky::Instruction::BINARY(op, lhs, rhs, dest) => match op {
+            tacky::BinaryOperator::DIVIDE => {
+                let left = Operand::from(lhs);
+                let right = Operand::from(rhs);
+                let destination = Operand::from(dest);
+                instructions.push(Instruction::MOV(left, Operand::REG(Register::AX)));
+                instructions.push(Instruction::CDQ);
+                instructions.push(Instruction::IDIV(right));
+                instructions.push(Instruction::MOV(Operand::REG(Register::AX), destination));
+            }
+            tacky::BinaryOperator::REMAINDER => {
+                let left = Operand::from(lhs);
+                let right = Operand::from(rhs);
+                let destination = Operand::from(dest);
+                instructions.push(Instruction::MOV(left, Operand::REG(Register::AX)));
+                instructions.push(Instruction::CDQ);
+                instructions.push(Instruction::IDIV(right));
+                instructions.push(Instruction::MOV(Operand::REG(Register::DX), destination));
+            }
+            _ => {
+                instructions.push(Instruction::MOV(
+                    Operand::from(lhs),
+                    Operand::from(dest.clone()),
+                ));
+                let op = match op {
+                    tacky::BinaryOperator::ADD => BinaryOperator::ADD,
+                    tacky::BinaryOperator::SUBTRACT => BinaryOperator::SUB,
+                    tacky::BinaryOperator::MULTIPLY => BinaryOperator::MUL,
+                    _ => unreachable!(),
+                };
+                instructions.push(Instruction::BINARY(
+                    op,
+                    Operand::from(rhs),
+                    Operand::from(dest),
+                ));
+            }
+        },
+    };
+    instructions
+}
+
+// Replace pseudo-operands with stack offsets.
+fn replace_pseudo_operands(instruction: Instruction, offsets: &mut StackOffsets) -> Instruction {
+    match instruction {
+        Instruction::MOV(Operand::PSEUDO(n1), Operand::PSEUDO(n2)) => {
+            let offset1 = offsets.get(&n1);
+            let offset2 = offsets.get(&n2);
+            Instruction::MOV(Operand::STACK(offset1), Operand::STACK(offset2))
+        }
+        Instruction::MOV(op, Operand::PSEUDO(n)) => {
+            Instruction::MOV(op, Operand::STACK(offsets.get(&n)))
+        }
+        Instruction::MOV(Operand::PSEUDO(n), op) => {
+            Instruction::MOV(Operand::STACK(offsets.get(&n)), op)
+        }
+        Instruction::UNARY(op, Operand::PSEUDO(name)) => {
+            Instruction::UNARY(op, Operand::STACK(offsets.get(&name)))
+        }
+        Instruction::BINARY(op, Operand::PSEUDO(n1), Operand::PSEUDO(n2)) => Instruction::BINARY(
+            op,
+            Operand::STACK(offsets.get(&n1)),
+            Operand::STACK(offsets.get(&n2)),
+        ),
+        Instruction::BINARY(op, lhs, Operand::PSEUDO(name)) => {
+            Instruction::BINARY(op, lhs, Operand::STACK(offsets.get(&name)))
+        }
+        Instruction::BINARY(op, Operand::PSEUDO(name), rhs) => {
+            Instruction::BINARY(op, Operand::STACK(offsets.get(&name)), rhs)
+        }
+        Instruction::IDIV(Operand::PSEUDO(name)) => {
+            Instruction::IDIV(Operand::STACK(offsets.get(&name)))
+        }
+        _ => instruction,
+    }
+}
+
+// Fix invalid instructions that may arise during translation.
+fn fix_invalid_instruction(instruction: Instruction) -> Vec<Instruction> {
+    let mut instructions = Vec::new();
+    match instruction {
+        Instruction::MOV(Operand::STACK(n1), Operand::STACK(n2)) => {
+            instructions.push(Instruction::MOV(
+                Operand::STACK(n1),
+                Operand::REG(Register::R10),
+            ));
+            instructions.push(Instruction::MOV(
+                Operand::REG(Register::R10),
+                Operand::STACK(n2),
+            ));
+        }
+        Instruction::BINARY(BinaryOperator::ADD, Operand::STACK(n1), Operand::STACK(n2)) => {
+            instructions.push(Instruction::MOV(
+                Operand::STACK(n1),
+                Operand::REG(Register::R10),
+            ));
+            instructions.push(Instruction::BINARY(
+                BinaryOperator::ADD,
+                Operand::REG(Register::R10),
+                Operand::STACK(n2),
+            ));
+        }
+        Instruction::BINARY(BinaryOperator::SUB, Operand::STACK(n1), Operand::STACK(n2)) => {
+            instructions.push(Instruction::MOV(
+                Operand::STACK(n1),
+                Operand::REG(Register::R10),
+            ));
+            instructions.push(Instruction::BINARY(
+                BinaryOperator::SUB,
+                Operand::REG(Register::R10),
+                Operand::STACK(n2),
+            ));
+        }
+        Instruction::BINARY(BinaryOperator::MUL, lhs, Operand::STACK(n)) => {
+            instructions.push(Instruction::MOV(
+                Operand::STACK(n),
+                Operand::REG(Register::R11),
+            ));
+            instructions.push(Instruction::BINARY(
+                BinaryOperator::MUL,
+                lhs,
+                Operand::REG(Register::R11),
+            ));
+            instructions.push(Instruction::MOV(
+                Operand::REG(Register::R11),
+                Operand::STACK(n),
+            ));
+        }
+        Instruction::IDIV(Operand::IMM(v)) => {
+            instructions.push(Instruction::MOV(
+                Operand::IMM(v),
+                Operand::REG(Register::R10),
+            ));
+            instructions.push(Instruction::IDIV(Operand::REG(Register::R10)));
+        }
+        _ => instructions.push(instruction),
+    };
+    instructions
+}
+
 impl From<tacky::Function> for Function {
     fn from(func: tacky::Function) -> Self {
         let name = String::from(func.name());
 
         let mut instructions: Vec<Instruction> = Vec::new();
-        instructions.push(Instruction::AllocateStack(0));
+        instructions.push(Instruction::ALLOCATE(0));
 
-        Vec::from(func)
-            .into_iter()
-            .for_each(|instruction| match instruction {
-                tacky::Instruction::RETURN(operand) => {
-                    let op = Operand::from(operand);
-                    instructions.push(Instruction::Mov(op, Operand::REG(Register::AX)));
-                    instructions.push(Instruction::Ret);
-                }
-                tacky::Instruction::UNARY(op, src, dest) => {
-                    let operator = UnaryOperator::from(op);
-                    let source = Operand::from(src);
-                    let destination = Operand::from(dest);
-                    instructions.push(Instruction::Mov(source, destination.clone()));
-                    instructions.push(Instruction::Unary(operator, destination));
-                }
-            });
+        for instr in Vec::from(func) {
+            let asm_instructions = generate_pseudo_instructions(instr);
+            instructions.extend(asm_instructions);
+        }
 
         let mut offsets = StackOffsets::default();
         let mut instructions = instructions
             .into_iter()
-            .map(|instruction| match instruction {
-                Instruction::Mov(Operand::PSEUDO(n1), Operand::PSEUDO(n2)) => {
-                    let offset1 = offsets.get(&n1);
-                    let offset2 = offsets.get(&n2);
-                    Instruction::Mov(Operand::STACK(offset1), Operand::STACK(offset2))
-                }
-                Instruction::Mov(op, Operand::PSEUDO(n)) => {
-                    Instruction::Mov(op, Operand::STACK(offsets.get(&n)))
-                }
-                Instruction::Mov(Operand::PSEUDO(n), op) => {
-                    Instruction::Mov(Operand::STACK(offsets.get(&n)), op)
-                }
-                Instruction::Unary(op, Operand::PSEUDO(name)) => {
-                    Instruction::Unary(op, Operand::STACK(offsets.get(&name)))
-                }
-                _ => instruction,
-            })
+            .map(|instr| replace_pseudo_operands(instr, &mut offsets))
             .collect::<Vec<Instruction>>();
 
         let size = offsets.size();
-        instructions[0] = Instruction::AllocateStack(size);
+        instructions[0] = Instruction::ALLOCATE(size);
 
-        let mut final_instructions: Vec<Instruction> = Vec::new();
-        instructions
+        let instructions = instructions
             .into_iter()
-            .for_each(|instruction| match instruction {
-                Instruction::Mov(Operand::STACK(n1), Operand::STACK(n2)) => {
-                    final_instructions.push(Instruction::Mov(
-                        Operand::STACK(n1),
-                        Operand::REG(Register::R10),
-                    ));
-                    final_instructions.push(Instruction::Mov(
-                        Operand::REG(Register::R10),
-                        Operand::STACK(n2),
-                    ));
-                }
-                _ => final_instructions.push(instruction),
-            });
+            .flat_map(|instr| fix_invalid_instruction(instr))
+            .collect::<Vec<Instruction>>();
 
-        Function(name, final_instructions)
+        Function(name, instructions)
     }
 }
 
+// Represents a program in x86-64 assembly.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program(Function);
 
