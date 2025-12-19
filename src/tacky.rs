@@ -33,6 +33,11 @@ pub enum BinaryOperator {
     MULTIPLY,
     DIVIDE,
     REMAINDER,
+    BITWISEAND,
+    BITWISEOR,
+    BITWISEXOR,
+    LEFTSHIFT,
+    RIGHTSHIFT,
 }
 
 impl fmt::Display for BinaryOperator {
@@ -43,6 +48,11 @@ impl fmt::Display for BinaryOperator {
             BinaryOperator::MULTIPLY => write!(f, "*"),
             BinaryOperator::DIVIDE => write!(f, "/"),
             BinaryOperator::REMAINDER => write!(f, "%"),
+            BinaryOperator::BITWISEAND => write!(f, "&"),
+            BinaryOperator::BITWISEOR => write!(f, "|"),
+            BinaryOperator::BITWISEXOR => write!(f, "^"),
+            BinaryOperator::LEFTSHIFT => write!(f, "<<"),
+            BinaryOperator::RIGHTSHIFT => write!(f, ">>"),
         }
     }
 }
@@ -55,11 +65,11 @@ impl From<parser::BinaryOperator> for BinaryOperator {
             parser::BinaryOperator::MULTIPLY => BinaryOperator::MULTIPLY,
             parser::BinaryOperator::DIVIDE => BinaryOperator::DIVIDE,
             parser::BinaryOperator::REMAINDER => BinaryOperator::REMAINDER,
-            parser::BinaryOperator::BITWISEAND => todo!(),
-            parser::BinaryOperator::BITWISEOR => todo!(),
-            parser::BinaryOperator::BITWISEXOR => todo!(),
-            parser::BinaryOperator::LEFTSHIFT => todo!(),
-            parser::BinaryOperator::RIGHTSHIFT => todo!(),
+            parser::BinaryOperator::BITWISEAND => BinaryOperator::BITWISEAND,
+            parser::BinaryOperator::BITWISEOR => BinaryOperator::BITWISEOR,
+            parser::BinaryOperator::BITWISEXOR => BinaryOperator::BITWISEXOR,
+            parser::BinaryOperator::LEFTSHIFT => BinaryOperator::LEFTSHIFT,
+            parser::BinaryOperator::RIGHTSHIFT => BinaryOperator::RIGHTSHIFT,
         }
     }
 }
@@ -104,27 +114,20 @@ fn generate_instructions(
             parser::Factor::INT(n) => Operand::CONSTANT(n.into()),
             parser::Factor::UNARY(op, exp) => {
                 let src = generate_instructions(parser::Expression::FACTOR(*exp), instructions);
-                let dst = format!("temp.{}", nanoid!(21));
-                instructions.push(Instruction::UNARY(
-                    UnaryOperator::from(op),
-                    src,
-                    Operand::VARIABLE(String::from(&dst)),
-                ));
-                Operand::VARIABLE(dst)
+                let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21)));
+                let op = UnaryOperator::from(op);
+                instructions.push(Instruction::UNARY(op, src, dst.clone()));
+                dst
             }
             parser::Factor::EXPRESSION(expr) => generate_instructions(*expr, instructions),
         },
         parser::Expression::BINARY(lhs, op, rhs) => {
-            let left = generate_instructions(*lhs, instructions);
-            let right = generate_instructions(*rhs, instructions);
-            let dst = format!("temp.{}", nanoid!(21));
-            instructions.push(Instruction::BINARY(
-                BinaryOperator::from(op),
-                left,
-                right,
-                Operand::VARIABLE(String::from(&dst)),
-            ));
-            Operand::VARIABLE(dst)
+            let lhs = generate_instructions(*lhs, instructions);
+            let rhs = generate_instructions(*rhs, instructions);
+            let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21)));
+            let op = BinaryOperator::from(op);
+            instructions.push(Instruction::BINARY(op, lhs, rhs, dst.clone()));
+            dst
         }
     }
 }

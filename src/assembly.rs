@@ -27,8 +27,8 @@ impl fmt::Display for Operand {
             Operand::IMM(c) => write!(f, "${c}"),
             Operand::REG(r) => match r {
                 Register::AX => write!(f, "%eax"),
-                Register::R10 => write!(f, "%r10d"),
                 Register::DX => write!(f, "%edx"),
+                Register::R10 => write!(f, "%r10d"),
                 Register::R11 => write!(f, "%r11d"),
             },
             Operand::PSEUDO(name) => panic!("Unexpected pseudo operand: {}", name),
@@ -76,6 +76,29 @@ enum BinaryOperator {
     ADD,
     SUB,
     MUL,
+    AND,
+    OR,
+    XOR,
+    SHL,
+    SHR,
+}
+
+impl TryFrom<tacky::BinaryOperator> for BinaryOperator {
+    type Error = String;
+
+    fn try_from(op: tacky::BinaryOperator) -> Result<Self, Self::Error> {
+        match op {
+            tacky::BinaryOperator::ADD => Ok(BinaryOperator::ADD),
+            tacky::BinaryOperator::SUBTRACT => Ok(BinaryOperator::SUB),
+            tacky::BinaryOperator::MULTIPLY => Ok(BinaryOperator::MUL),
+            tacky::BinaryOperator::BITWISEAND => Ok(BinaryOperator::AND),
+            tacky::BinaryOperator::BITWISEOR => Ok(BinaryOperator::OR),
+            tacky::BinaryOperator::BITWISEXOR => Ok(BinaryOperator::XOR),
+            tacky::BinaryOperator::LEFTSHIFT => Ok(BinaryOperator::SHL),
+            tacky::BinaryOperator::RIGHTSHIFT => Ok(BinaryOperator::SHR),
+            _ => Err(format!("Unsupported assembly operator: {:?}", op)),
+        }
+    }
 }
 
 // Instructions in x86-64 assembly.
@@ -104,6 +127,11 @@ impl fmt::Display for Instruction {
                     BinaryOperator::ADD => "addl",
                     BinaryOperator::SUB => "subl",
                     BinaryOperator::MUL => "imull",
+                    BinaryOperator::AND => "andl",
+                    BinaryOperator::OR => "orl",
+                    BinaryOperator::XOR => "xorl",
+                    BinaryOperator::SHL => "shll",
+                    BinaryOperator::SHR => "shrl",
                 };
                 write!(f, "\t{} {}, {}", op_str, lhs, rhs)
             }
@@ -170,44 +198,38 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
             instructions.push(Instruction::RET);
         }
         tacky::Instruction::UNARY(op, src, dest) => {
-            let operator = UnaryOperator::from(op);
-            let source = Operand::from(src);
-            let destination = Operand::from(dest);
-            instructions.push(Instruction::MOV(source, destination.clone()));
-            instructions.push(Instruction::UNARY(operator, destination));
+            let op = UnaryOperator::from(op);
+            let src = Operand::from(src);
+            let dest = Operand::from(dest);
+            instructions.push(Instruction::MOV(src, dest.clone()));
+            instructions.push(Instruction::UNARY(op, dest));
         }
         tacky::Instruction::BINARY(op, lhs, rhs, dest) => match op {
             tacky::BinaryOperator::DIVIDE => {
-                let left = Operand::from(lhs);
-                let right = Operand::from(rhs);
-                let destination = Operand::from(dest);
-                instructions.push(Instruction::MOV(left, Operand::REG(Register::AX)));
+                let lhs = Operand::from(lhs);
+                let rhs = Operand::from(rhs);
+                let dest = Operand::from(dest);
+                instructions.push(Instruction::MOV(lhs, Operand::REG(Register::AX)));
                 instructions.push(Instruction::CDQ);
-                instructions.push(Instruction::IDIV(right));
-                instructions.push(Instruction::MOV(Operand::REG(Register::AX), destination));
+                instructions.push(Instruction::IDIV(rhs));
+                instructions.push(Instruction::MOV(Operand::REG(Register::AX), dest));
             }
             tacky::BinaryOperator::REMAINDER => {
-                let left = Operand::from(lhs);
-                let right = Operand::from(rhs);
-                let destination = Operand::from(dest);
-                instructions.push(Instruction::MOV(left, Operand::REG(Register::AX)));
+                let lhs = Operand::from(lhs);
+                let rhs = Operand::from(rhs);
+                let dest = Operand::from(dest);
+                instructions.push(Instruction::MOV(lhs, Operand::REG(Register::AX)));
                 instructions.push(Instruction::CDQ);
-                instructions.push(Instruction::IDIV(right));
-                instructions.push(Instruction::MOV(Operand::REG(Register::DX), destination));
+                instructions.push(Instruction::IDIV(rhs));
+                instructions.push(Instruction::MOV(Operand::REG(Register::DX), dest));
             }
             _ => {
                 instructions.push(Instruction::MOV(
                     Operand::from(lhs),
                     Operand::from(dest.clone()),
                 ));
-                let op = match op {
-                    tacky::BinaryOperator::ADD => BinaryOperator::ADD,
-                    tacky::BinaryOperator::SUBTRACT => BinaryOperator::SUB,
-                    tacky::BinaryOperator::MULTIPLY => BinaryOperator::MUL,
-                    _ => unreachable!(),
-                };
                 instructions.push(Instruction::BINARY(
-                    op,
+                    BinaryOperator::try_from(op).unwrap(),
                     Operand::from(rhs),
                     Operand::from(dest),
                 ));
@@ -266,27 +288,12 @@ fn fix_invalid_instruction(instruction: Instruction) -> Vec<Instruction> {
                 Operand::STACK(n2),
             ));
         }
-        Instruction::BINARY(BinaryOperator::ADD, Operand::STACK(n1), Operand::STACK(n2)) => {
+        Instruction::IDIV(Operand::IMM(v)) => {
             instructions.push(Instruction::MOV(
-                Operand::STACK(n1),
+                Operand::IMM(v),
                 Operand::REG(Register::R10),
             ));
-            instructions.push(Instruction::BINARY(
-                BinaryOperator::ADD,
-                Operand::REG(Register::R10),
-                Operand::STACK(n2),
-            ));
-        }
-        Instruction::BINARY(BinaryOperator::SUB, Operand::STACK(n1), Operand::STACK(n2)) => {
-            instructions.push(Instruction::MOV(
-                Operand::STACK(n1),
-                Operand::REG(Register::R10),
-            ));
-            instructions.push(Instruction::BINARY(
-                BinaryOperator::SUB,
-                Operand::REG(Register::R10),
-                Operand::STACK(n2),
-            ));
+            instructions.push(Instruction::IDIV(Operand::REG(Register::R10)));
         }
         Instruction::BINARY(BinaryOperator::MUL, lhs, Operand::STACK(n)) => {
             instructions.push(Instruction::MOV(
@@ -303,12 +310,16 @@ fn fix_invalid_instruction(instruction: Instruction) -> Vec<Instruction> {
                 Operand::STACK(n),
             ));
         }
-        Instruction::IDIV(Operand::IMM(v)) => {
+        Instruction::BINARY(op, Operand::STACK(n1), Operand::STACK(n2)) => {
             instructions.push(Instruction::MOV(
-                Operand::IMM(v),
+                Operand::STACK(n1),
                 Operand::REG(Register::R10),
             ));
-            instructions.push(Instruction::IDIV(Operand::REG(Register::R10)));
+            instructions.push(Instruction::BINARY(
+                op,
+                Operand::REG(Register::R10),
+                Operand::STACK(n2),
+            ));
         }
         _ => instructions.push(instruction),
     };
