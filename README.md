@@ -1,6 +1,6 @@
 # CCR – A C Compiler in Rust  
 
-This project presents a full implementation of the compiler described in Nora Sandler’s Writing a C Compiler: Build a Real Programming Language from Scratch. The compiler is implemented in Rust and supports a subset of the C language, including arithmetic expressions, bitwise operations, control-flow statements, and more. As outlined in the book, the compiler is structured into five compilation stages:
+This project presents a full implementation of the compiler described in Nora Sandler’s *[Writing a C Compiler: Build a Real Programming Language from Scratch](https://nostarch.com/writing-c-compiler)*. The compiler is implemented in Rust and supports a subset of the C language, including arithmetic expressions, bitwise operations, control-flow statements, and more. As outlined in the book, the compiler is structured into five compilation stages:
 
 1. **Lexing (Tokenization)** – Converts the input source code into a stream of tokens.
 2. **Parsing** – Builds an abstract syntax tree (AST) using recursive descent with precedence climbing.
