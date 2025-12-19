@@ -6,7 +6,7 @@ use tracing::info;
 const IDENTIFIER_PATTERN: &str = r"[a-zA-Z]\w*\b";
 const CONSTANT_PATTERN: &str = r"[0-9]+\b";
 const KEYWORD_PATTERN: &str = r"int|void|return\b";
-const OPERATOR_PATTERN: &str = r"--|[\-~\+\*/%]";
+const OPERATOR_PATTERN: &str = r"--|<<|>>|[\-~\+\*\/%&\|\^]";
 const DELIMITER_PATTERN: &str = r"[\(\);\{\}]";
 
 #[derive(Debug, PartialEq, Clone)]
@@ -101,15 +101,17 @@ fn tokenize(s: &str) -> Result<Match, String> {
 
 /// Lex the input C source code into a vector of tokens.
 pub fn lex(input: &str) -> Result<Vec<Token>, String> {
+    let chars = input.chars().collect::<Vec<char>>();
+
     let mut tokens = Vec::new();
     let mut i = 0;
 
     info!("Lexing/tokenizing input...");
     while i < input.len() {
-        while i < input.len() && input[i..].starts_with(char::is_whitespace) {
+        while chars.get(i).is_some_and(|c| c.is_whitespace()) {
             i += 1;
         }
-        if i < input.len() && !input[i..].is_empty() {
+        if input.get(i..).is_some_and(|s| !s.is_empty()) {
             let tkn = tokenize(&input[i..])?;
             if let Match(Some(t), length) = tkn {
                 tokens.push(t);

@@ -10,6 +10,11 @@ pub enum Operator {
     PRODUCT,
     DIVISION,
     REMAINDER,
+    BITWISEAND,
+    BITWISEOR,
+    BITWISEXOR,
+    LEFTSHIFT,
+    RIGHTSHIFT,
 }
 
 impl FromStr for Operator {
@@ -24,6 +29,11 @@ impl FromStr for Operator {
             "*" => Ok(Operator::PRODUCT),
             "/" => Ok(Operator::DIVISION),
             "%" => Ok(Operator::REMAINDER),
+            "&" => Ok(Operator::BITWISEAND),
+            "|" => Ok(Operator::BITWISEOR),
+            "^" => Ok(Operator::BITWISEXOR),
+            "<<" => Ok(Operator::LEFTSHIFT),
+            ">>" => Ok(Operator::RIGHTSHIFT),
             _ => Err(format!("Unknown operator: {}", s)),
         }
     }
@@ -39,6 +49,11 @@ impl fmt::Display for Operator {
             Operator::PRODUCT => write!(f, "*"),
             Operator::DIVISION => write!(f, "/"),
             Operator::REMAINDER => write!(f, "%"),
+            Operator::BITWISEAND => write!(f, "&"),
+            Operator::BITWISEOR => write!(f, "|"),
+            Operator::BITWISEXOR => write!(f, "^"),
+            Operator::LEFTSHIFT => write!(f, "<<"),
+            Operator::RIGHTSHIFT => write!(f, ">>"),
         }
     }
 }
@@ -140,15 +155,23 @@ impl Token {
                 | Token::OPERATOR(Operator::DIVISION)
                 | Token::OPERATOR(Operator::REMAINDER)
                 | Token::OPERATOR(Operator::NEGATION)
+                | Token::OPERATOR(Operator::BITWISEAND)
+                | Token::OPERATOR(Operator::BITWISEOR)
+                | Token::OPERATOR(Operator::BITWISEXOR)
+                | Token::OPERATOR(Operator::LEFTSHIFT)
+                | Token::OPERATOR(Operator::RIGHTSHIFT)
         )
     }
     pub fn precedence(&self) -> u64 {
         match self {
-            Self::OPERATOR(Operator::ADDITION) => 45,
-            Self::OPERATOR(Operator::NEGATION) => 45,
-            Self::OPERATOR(Operator::PRODUCT) => 50,
-            Self::OPERATOR(Operator::DIVISION) => 50,
-            Self::OPERATOR(Operator::REMAINDER) => 50,
+            Self::OPERATOR(Operator::BITWISEOR) => 25,
+            Self::OPERATOR(Operator::BITWISEXOR) => 30,
+            Self::OPERATOR(Operator::BITWISEAND) => 35,
+            Self::OPERATOR(Operator::RIGHTSHIFT) | Self::OPERATOR(Operator::LEFTSHIFT) => 40,
+            Self::OPERATOR(Operator::ADDITION) | Self::OPERATOR(Operator::NEGATION) => 45,
+            Self::OPERATOR(Operator::PRODUCT)
+            | Self::OPERATOR(Operator::DIVISION)
+            | Self::OPERATOR(Operator::REMAINDER) => 50,
             _ => 0,
         }
     }
