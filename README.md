@@ -1,69 +1,51 @@
 # CCR – A C Compiler in Rust  
 
-This project implements the full compiler described in Raymond Rhine’s *Writing a C Compiler*, written in Rust and built on macOS (both Intel & Apple Silicon). The compiler supports a working subset of the C language and produces native executables for your machine. The project includes all four core compiler stages:  
-  1. **Lexing** – tokenising the input source.  
-  2. **Parsing** – building an Abstract Syntax Tree (AST).  
-  3. **Code Generation** – emitting x86-64 (macOS) assembly.  
-  4. **Assembly & Linking** – producing a runnable native executable.  
+This project presents a full implementation of the compiler described in Nora Sandler’s Writing a C Compiler: Build a Real Programming Language from Scratch. The compiler is implemented in Rust and supports a subset of the C language, including arithmetic expressions, bitwise operations, control-flow statements, and more. As outlined in the book, the compiler is structured into five compilation stages:
 
-## Supported Subset of C  
+1. **Lexing (Tokenization)** – Converts the input source code into a stream of tokens.
+2. **Parsing** – Builds an abstract syntax tree (AST) using recursive descent with precedence climbing.
+3. **Tacky (Three-Address Code)** – Linearizes the AST into a sequence of simple instructions using three-address code (TAC).
+4. **Code Generation** – Translates TAC instructions into target assembly code.
+5. **Linking** – Assembles and links the generated assembly into a native executable.
 
-This compiler currently supports the following features of C (subset as implemented):  
-- Simple integer type (`int`) and integer return values.  
-- Function definitions and calls returning `int`.  
-- Arithmetic expressions (`+`, `-`, `*`, `/`, `%`).  
-- Unary operators (once enabled) such as unary minus and logical/bitwise not.  
-- Control-flow statements: `if`, `else`, `while`, `return`.  
-- Local variables (in functions) and basic scoping.  
-- No full standard library support; omitted features include pointers, arrays, structs/unions, floating-point, variadic functions, complex type casts, and advanced built-in types.  
+## Command-Line Interface (CLI)
 
-## Command-Line Interface (CLI)  
+You can interact with the compiler through a command-line interface (CLI). The CLI allows you to run the compiler normally or stop execution at a specific compilation stage.
 
-The compiler exposes the following command-line interface:
+### Example Usage
 
 ```bash
-Usage: ccr [OPTIONS] <PATH>
+# Display available CLI options and flags
+cargo run -- --help
 
-Arguments:
-  <PATH>  Absolute or relative path to C source file
-
-Options:
-      --lex      Runs the lexer and exits
-      --parse    Runs the parser and exits
-      --codegen  Runs assembly generation and exits
-  -h, --help     Print help
-```
-
-### Description of CLI Flags  
-
-- `--lex` → run only the lexer and exit  
-- `--parse` → run only the parser and exit  
-- `--codegen` → run only up to code generation (no linking)  
-- If none of those flags are provided, the full pipeline (lex → parse → codegen → link) runs.  
-- `<path>` is required: the path (absolute or relative) to your C source file.
-
-### Example Usage  
-
-```bash
+# Compile the C program normally (runs all compilation stages)
 cargo run -- path/to/my_program.c
+
+# Run the compiler and stop after the lexing stage
 cargo run -- --lex path/to/my_program.c
+
+# Run the compiler and stop after the parsing stage (AST generation)
 cargo run -- --parse path/to/my_program.c
+
+# Run the compiler and stop after code generation (emit assembly)
 cargo run -- --codegen path/to/my_program.c
 ```
 
 ## Local Installation (macOS)  
 
 **Prerequisites**:
-- Rust toolchain installed (via `rustup`)  
-- `cargo` (comes with Rust)  
-- Unix-style linking tools (installed by default on macOS)
+
+To build and run this project, ensure the following command-line tools are installed:
+
+- The Rust toolchain, installed via `rustup`, with `cargo`
+- A system C compiler (`gcc` or `clang`, accessible as `gcc`)
 
 ```bash
-# If on Apple Silicon Mac, run the shell in Intel (x86_64) mode:
-arch -x86_64 zsh
-
 # Build the project
 cargo build
+
+# If on Apple Silicon Mac, run the shell in Intel (x86_64) mode:
+arch -x86_64 zsh
 
 # Run the compiler
 cargo run -- path/to/my_program.c
