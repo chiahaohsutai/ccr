@@ -55,6 +55,11 @@ impl From<parser::BinaryOperator> for BinaryOperator {
             parser::BinaryOperator::MULTIPLY => BinaryOperator::MULTIPLY,
             parser::BinaryOperator::DIVIDE => BinaryOperator::DIVIDE,
             parser::BinaryOperator::REMAINDER => BinaryOperator::REMAINDER,
+            parser::BinaryOperator::BITWISEAND => todo!(),
+            parser::BinaryOperator::BITWISEOR => todo!(),
+            parser::BinaryOperator::BITWISEXOR => todo!(),
+            parser::BinaryOperator::LEFTSHIFT => todo!(),
+            parser::BinaryOperator::RIGHTSHIFT => todo!(),
         }
     }
 }

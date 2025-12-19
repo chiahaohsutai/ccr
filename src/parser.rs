@@ -87,6 +87,11 @@ pub enum BinaryOperator {
     MULTIPLY,
     DIVIDE,
     REMAINDER,
+    BITWISEAND,
+    BITWISEOR,
+    BITWISEXOR,
+    LEFTSHIFT,
+    RIGHTSHIFT,
 }
 
 impl fmt::Display for BinaryOperator {
@@ -97,6 +102,11 @@ impl fmt::Display for BinaryOperator {
             BinaryOperator::MULTIPLY => write!(f, "*"),
             BinaryOperator::DIVIDE => write!(f, "/"),
             BinaryOperator::REMAINDER => write!(f, "%"),
+            BinaryOperator::BITWISEAND => write!(f, "&"),
+            BinaryOperator::BITWISEOR => write!(f, "|"),
+            BinaryOperator::BITWISEXOR => write!(f, "^"),
+            BinaryOperator::LEFTSHIFT => write!(f, "<<"),
+            BinaryOperator::RIGHTSHIFT => write!(f, ">>"),
         }
     }
 }
@@ -111,6 +121,11 @@ impl TryFrom<tokens::Operator> for BinaryOperator {
             tokens::Operator::PRODUCT => Ok(BinaryOperator::MULTIPLY),
             tokens::Operator::DIVISION => Ok(BinaryOperator::DIVIDE),
             tokens::Operator::REMAINDER => Ok(BinaryOperator::REMAINDER),
+            tokens::Operator::BITWISEAND => Ok(BinaryOperator::BITWISEAND),
+            tokens::Operator::BITWISEOR => Ok(BinaryOperator::BITWISEOR),
+            tokens::Operator::BITWISEXOR => Ok(BinaryOperator::BITWISEXOR),
+            tokens::Operator::LEFTSHIFT => Ok(BinaryOperator::LEFTSHIFT),
+            tokens::Operator::RIGHTSHIFT => Ok(BinaryOperator::RIGHTSHIFT),
             _ => Err(format!("Operator '{}' is not a binary operator.", op)),
         }
     }
