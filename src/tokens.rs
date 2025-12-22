@@ -15,6 +15,15 @@ pub enum Operator {
     BITWISEXOR,
     LEFTSHIFT,
     RIGHTSHIFT,
+    NOT,
+    AND,
+    OR,
+    EQUAL,
+    NOTEQUAL,
+    LESSTHAN,
+    GREATERTHAN,
+    LESSEQUAL,
+    GREATEREQUAL,
 }
 
 impl FromStr for Operator {
@@ -34,6 +43,15 @@ impl FromStr for Operator {
             "^" => Ok(Operator::BITWISEXOR),
             "<<" => Ok(Operator::LEFTSHIFT),
             ">>" => Ok(Operator::RIGHTSHIFT),
+            "!" => Ok(Operator::NOT),
+            "&&" => Ok(Operator::AND),
+            "||" => Ok(Operator::OR),
+            "==" => Ok(Operator::EQUAL),
+            "!=" => Ok(Operator::NOTEQUAL),
+            "<" => Ok(Operator::LESSTHAN),
+            ">" => Ok(Operator::GREATERTHAN),
+            "<=" => Ok(Operator::LESSEQUAL),
+            ">=" => Ok(Operator::GREATEREQUAL),
             _ => Err(format!("Unknown operator: {}", s)),
         }
     }
@@ -54,6 +72,15 @@ impl fmt::Display for Operator {
             Operator::BITWISEXOR => write!(f, "^"),
             Operator::LEFTSHIFT => write!(f, "<<"),
             Operator::RIGHTSHIFT => write!(f, ">>"),
+            Operator::NOT => write!(f, "!"),
+            Operator::AND => write!(f, "&&"),
+            Operator::OR => write!(f, "||"),
+            Operator::EQUAL => write!(f, "=="),
+            Operator::NOTEQUAL => write!(f, "!="),
+            Operator::LESSTHAN => write!(f, "<"),
+            Operator::GREATERTHAN => write!(f, ">"),
+            Operator::LESSEQUAL => write!(f, "<="),
+            Operator::GREATEREQUAL => write!(f, ">="),
         }
     }
 }
