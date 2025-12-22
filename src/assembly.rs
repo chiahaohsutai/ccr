@@ -8,6 +8,8 @@ use super::tacky;
 enum Register {
     AX,
     DX,
+    CX,
+    CL,
     R10,
     R11,
 }
@@ -26,7 +28,9 @@ impl fmt::Display for Operand {
         match self {
             Operand::IMM(c) => write!(f, "${c}"),
             Operand::REG(r) => match r {
+                Register::CL => write!(f, "%cl"),
                 Register::AX => write!(f, "%eax"),
+                Register::CX => write!(f, "%ecx"),
                 Register::DX => write!(f, "%edx"),
                 Register::R10 => write!(f, "%r10d"),
                 Register::R11 => write!(f, "%r11d"),
@@ -80,7 +84,7 @@ enum BinaryOperator {
     OR,
     XOR,
     SHL,
-    SHR,
+    SAR,
 }
 
 impl TryFrom<tacky::BinaryOperator> for BinaryOperator {
@@ -95,7 +99,7 @@ impl TryFrom<tacky::BinaryOperator> for BinaryOperator {
             tacky::BinaryOperator::BITWISEOR => Ok(BinaryOperator::OR),
             tacky::BinaryOperator::BITWISEXOR => Ok(BinaryOperator::XOR),
             tacky::BinaryOperator::LEFTSHIFT => Ok(BinaryOperator::SHL),
-            tacky::BinaryOperator::RIGHTSHIFT => Ok(BinaryOperator::SHR),
+            tacky::BinaryOperator::RIGHTSHIFT => Ok(BinaryOperator::SAR),
             _ => Err(format!("Unsupported assembly operator: {:?}", op)),
         }
     }
@@ -131,7 +135,7 @@ impl fmt::Display for Instruction {
                     BinaryOperator::OR => "orl",
                     BinaryOperator::XOR => "xorl",
                     BinaryOperator::SHL => "shll",
-                    BinaryOperator::SHR => "shrl",
+                    BinaryOperator::SAR => "sarl",
                 };
                 write!(f, "\t{} {}, {}", op_str, lhs, rhs)
             }
@@ -222,6 +226,15 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
                 instructions.push(Instruction::CDQ);
                 instructions.push(Instruction::IDIV(rhs));
                 instructions.push(Instruction::MOV(Operand::REG(Register::DX), dest));
+            }
+            tacky::BinaryOperator::RIGHTSHIFT | tacky::BinaryOperator::LEFTSHIFT => {
+                let lhs = Operand::from(lhs);
+                let rhs = Operand::from(rhs);
+                let dest = Operand::from(dest);
+                let op = BinaryOperator::try_from(op).unwrap();
+                instructions.push(Instruction::MOV(lhs, dest.clone()));
+                instructions.push(Instruction::MOV(rhs, Operand::REG(Register::CX)));
+                instructions.push(Instruction::BINARY(op, Operand::REG(Register::CL), dest));
             }
             _ => {
                 instructions.push(Instruction::MOV(
