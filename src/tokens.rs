@@ -187,13 +187,28 @@ impl Token {
                 | Token::OPERATOR(Operator::BITWISEXOR)
                 | Token::OPERATOR(Operator::LEFTSHIFT)
                 | Token::OPERATOR(Operator::RIGHTSHIFT)
+                | Token::OPERATOR(Operator::AND)
+                | Token::OPERATOR(Operator::OR)
+                | Token::OPERATOR(Operator::EQUAL)
+                | Token::OPERATOR(Operator::NOTEQUAL)
+                | Token::OPERATOR(Operator::LESSTHAN)
+                | Token::OPERATOR(Operator::GREATERTHAN)
+                | Token::OPERATOR(Operator::LESSEQUAL)
+                | Token::OPERATOR(Operator::GREATEREQUAL)
         )
     }
     pub fn precedence(&self) -> u64 {
         match self {
-            Self::OPERATOR(Operator::BITWISEOR) => 25,
-            Self::OPERATOR(Operator::BITWISEXOR) => 30,
-            Self::OPERATOR(Operator::BITWISEAND) => 35,
+            Self::OPERATOR(Operator::OR) => 5,
+            Self::OPERATOR(Operator::AND) => 10,
+            Self::OPERATOR(Operator::BITWISEOR) => 15,
+            Self::OPERATOR(Operator::BITWISEXOR) => 20,
+            Self::OPERATOR(Operator::BITWISEAND) => 25,
+            Self::OPERATOR(Operator::EQUAL) | Self::OPERATOR(Operator::NOTEQUAL) => 30,
+            Self::OPERATOR(Operator::LESSTHAN)
+            | Self::OPERATOR(Operator::GREATERTHAN)
+            | Self::OPERATOR(Operator::LESSEQUAL)
+            | Self::OPERATOR(Operator::GREATEREQUAL) => 35,
             Self::OPERATOR(Operator::RIGHTSHIFT) | Self::OPERATOR(Operator::LEFTSHIFT) => 40,
             Self::OPERATOR(Operator::ADDITION) | Self::OPERATOR(Operator::NEGATION) => 45,
             Self::OPERATOR(Operator::PRODUCT)

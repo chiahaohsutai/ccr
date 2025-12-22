@@ -57,6 +57,7 @@ impl AsRef<str> for Identifier {
 pub enum UnaryOperator {
     NEGATE,
     COMPLEMENT,
+    NOT,
 }
 
 impl fmt::Display for UnaryOperator {
@@ -64,6 +65,7 @@ impl fmt::Display for UnaryOperator {
         match self {
             UnaryOperator::NEGATE => write!(f, "-"),
             UnaryOperator::COMPLEMENT => write!(f, "~"),
+            UnaryOperator::NOT => write!(f, "!"),
         }
     }
 }
@@ -75,6 +77,7 @@ impl TryFrom<tokens::Operator> for UnaryOperator {
         match op {
             tokens::Operator::NEGATION => Ok(UnaryOperator::NEGATE),
             tokens::Operator::COMPLEMENT => Ok(UnaryOperator::COMPLEMENT),
+            tokens::Operator::NOT => Ok(UnaryOperator::NOT),
             _ => Err(format!("Operator '{}' is not a unary operator.", op)),
         }
     }
@@ -92,6 +95,14 @@ pub enum BinaryOperator {
     BITWISEXOR,
     LEFTSHIFT,
     RIGHTSHIFT,
+    AND,
+    OR,
+    EQUAL,
+    NOTEQUAL,
+    LESSTHAN,
+    GREATERTHAN,
+    LESSEQUAL,
+    GREATEREQUAL,
 }
 
 impl fmt::Display for BinaryOperator {
@@ -107,6 +118,14 @@ impl fmt::Display for BinaryOperator {
             BinaryOperator::BITWISEXOR => write!(f, "^"),
             BinaryOperator::LEFTSHIFT => write!(f, "<<"),
             BinaryOperator::RIGHTSHIFT => write!(f, ">>"),
+            BinaryOperator::AND => write!(f, "&&"),
+            BinaryOperator::OR => write!(f, "||"),
+            BinaryOperator::EQUAL => write!(f, "=="),
+            BinaryOperator::NOTEQUAL => write!(f, "!="),
+            BinaryOperator::LESSTHAN => write!(f, "<"),
+            BinaryOperator::GREATERTHAN => write!(f, ">"),
+            BinaryOperator::LESSEQUAL => write!(f, "<="),
+            BinaryOperator::GREATEREQUAL => write!(f, ">="),
         }
     }
 }
@@ -126,6 +145,14 @@ impl TryFrom<tokens::Operator> for BinaryOperator {
             tokens::Operator::BITWISEXOR => Ok(BinaryOperator::BITWISEXOR),
             tokens::Operator::LEFTSHIFT => Ok(BinaryOperator::LEFTSHIFT),
             tokens::Operator::RIGHTSHIFT => Ok(BinaryOperator::RIGHTSHIFT),
+            tokens::Operator::AND => Ok(BinaryOperator::AND),
+            tokens::Operator::OR => Ok(BinaryOperator::OR),
+            tokens::Operator::EQUAL => Ok(BinaryOperator::EQUAL),
+            tokens::Operator::NOTEQUAL => Ok(BinaryOperator::NOTEQUAL),
+            tokens::Operator::LESSTHAN => Ok(BinaryOperator::LESSTHAN),
+            tokens::Operator::GREATERTHAN => Ok(BinaryOperator::GREATERTHAN),
+            tokens::Operator::LESSEQUAL => Ok(BinaryOperator::LESSEQUAL),
+            tokens::Operator::GREATEREQUAL => Ok(BinaryOperator::GREATEREQUAL),
             _ => Err(format!("Operator '{}' is not a binary operator.", op)),
         }
     }
@@ -253,6 +280,10 @@ fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Factor, String> {
             tokens::Operator::COMPLEMENT => {
                 let factor = parse_factor(tokens)?;
                 Ok(Factor::UNARY(UnaryOperator::COMPLEMENT, Box::new(factor)))
+            }
+            tokens::Operator::NOT => {
+                let factor = parse_factor(tokens)?;
+                Ok(Factor::UNARY(UnaryOperator::NOT, Box::new(factor)))
             }
             _ => Err(format!("Unexpected operator '{}' in factor.", op)),
         },

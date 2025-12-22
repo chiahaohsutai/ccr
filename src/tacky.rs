@@ -22,6 +22,7 @@ impl From<parser::UnaryOperator> for UnaryOperator {
         match op {
             parser::UnaryOperator::COMPLEMENT => UnaryOperator::COMPLEMENT,
             parser::UnaryOperator::NEGATE => UnaryOperator::NEGATE,
+            _ => todo!(),
         }
     }
 }
@@ -70,6 +71,7 @@ impl From<parser::BinaryOperator> for BinaryOperator {
             parser::BinaryOperator::BITWISEXOR => BinaryOperator::BITWISEXOR,
             parser::BinaryOperator::LEFTSHIFT => BinaryOperator::LEFTSHIFT,
             parser::BinaryOperator::RIGHTSHIFT => BinaryOperator::RIGHTSHIFT,
+            _ => todo!(),
         }
     }
 }
