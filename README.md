@@ -31,7 +31,7 @@ cargo run -- --parse path/to/my_program.c
 cargo run -- --codegen path/to/my_program.c
 ```
 
-## Local Installation (macOS)  
+## Local Installation
 
 **Prerequisites**:
 
