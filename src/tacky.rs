@@ -6,6 +6,7 @@ use std::fmt;
 pub enum UnaryOperator {
     COMPLEMENT,
     NEGATE,
+    NOT,
 }
 
 impl fmt::Display for UnaryOperator {
@@ -13,6 +14,7 @@ impl fmt::Display for UnaryOperator {
         match self {
             UnaryOperator::COMPLEMENT => write!(f, "~"),
             UnaryOperator::NEGATE => write!(f, "-"),
+            UnaryOperator::NOT => write!(f, "!"),
         }
     }
 }
@@ -22,7 +24,7 @@ impl From<parser::UnaryOperator> for UnaryOperator {
         match op {
             parser::UnaryOperator::COMPLEMENT => UnaryOperator::COMPLEMENT,
             parser::UnaryOperator::NEGATE => UnaryOperator::NEGATE,
-            _ => todo!(),
+            parser::UnaryOperator::NOT => UnaryOperator::NOT,
         }
     }
 }
@@ -39,6 +41,12 @@ pub enum BinaryOperator {
     BITWISEXOR,
     LEFTSHIFT,
     RIGHTSHIFT,
+    EQUAL,
+    NOTEQUAL,
+    LESSTHAN,
+    GREATERTHAN,
+    LESSEQUAL,
+    GREATEREQUAL,
 }
 
 impl fmt::Display for BinaryOperator {
@@ -54,24 +62,38 @@ impl fmt::Display for BinaryOperator {
             BinaryOperator::BITWISEXOR => write!(f, "^"),
             BinaryOperator::LEFTSHIFT => write!(f, "<<"),
             BinaryOperator::RIGHTSHIFT => write!(f, ">>"),
+            BinaryOperator::EQUAL => write!(f, "=="),
+            BinaryOperator::NOTEQUAL => write!(f, "!="),
+            BinaryOperator::LESSTHAN => write!(f, "<"),
+            BinaryOperator::GREATERTHAN => write!(f, ">"),
+            BinaryOperator::LESSEQUAL => write!(f, "<="),
+            BinaryOperator::GREATEREQUAL => write!(f, ">="),
         }
     }
 }
 
-impl From<parser::BinaryOperator> for BinaryOperator {
-    fn from(op: parser::BinaryOperator) -> Self {
+impl TryFrom<parser::BinaryOperator> for BinaryOperator {
+    type Error = String;
+
+    fn try_from(op: parser::BinaryOperator) -> Result<Self, String> {
         match op {
-            parser::BinaryOperator::ADD => BinaryOperator::ADD,
-            parser::BinaryOperator::SUBTRACT => BinaryOperator::SUBTRACT,
-            parser::BinaryOperator::MULTIPLY => BinaryOperator::MULTIPLY,
-            parser::BinaryOperator::DIVIDE => BinaryOperator::DIVIDE,
-            parser::BinaryOperator::REMAINDER => BinaryOperator::REMAINDER,
-            parser::BinaryOperator::BITWISEAND => BinaryOperator::BITWISEAND,
-            parser::BinaryOperator::BITWISEOR => BinaryOperator::BITWISEOR,
-            parser::BinaryOperator::BITWISEXOR => BinaryOperator::BITWISEXOR,
-            parser::BinaryOperator::LEFTSHIFT => BinaryOperator::LEFTSHIFT,
-            parser::BinaryOperator::RIGHTSHIFT => BinaryOperator::RIGHTSHIFT,
-            _ => todo!(),
+            parser::BinaryOperator::ADD => Ok(BinaryOperator::ADD),
+            parser::BinaryOperator::SUBTRACT => Ok(BinaryOperator::SUBTRACT),
+            parser::BinaryOperator::MULTIPLY => Ok(BinaryOperator::MULTIPLY),
+            parser::BinaryOperator::DIVIDE => Ok(BinaryOperator::DIVIDE),
+            parser::BinaryOperator::REMAINDER => Ok(BinaryOperator::REMAINDER),
+            parser::BinaryOperator::BITWISEAND => Ok(BinaryOperator::BITWISEAND),
+            parser::BinaryOperator::BITWISEOR => Ok(BinaryOperator::BITWISEOR),
+            parser::BinaryOperator::BITWISEXOR => Ok(BinaryOperator::BITWISEXOR),
+            parser::BinaryOperator::LEFTSHIFT => Ok(BinaryOperator::LEFTSHIFT),
+            parser::BinaryOperator::RIGHTSHIFT => Ok(BinaryOperator::RIGHTSHIFT),
+            parser::BinaryOperator::EQUAL => Ok(BinaryOperator::EQUAL),
+            parser::BinaryOperator::NOTEQUAL => Ok(BinaryOperator::NOTEQUAL),
+            parser::BinaryOperator::LESSTHAN => Ok(BinaryOperator::LESSTHAN),
+            parser::BinaryOperator::GREATERTHAN => Ok(BinaryOperator::GREATERTHAN),
+            parser::BinaryOperator::LESSEQUAL => Ok(BinaryOperator::LESSEQUAL),
+            parser::BinaryOperator::GREATEREQUAL => Ok(BinaryOperator::GREATEREQUAL),
+            _ => Err(format!("Operator '{:?}' is not a tacky binary op.", op)),
         }
     }
 }
@@ -95,6 +117,11 @@ pub enum Instruction {
     RETURN(Operand),
     UNARY(UnaryOperator, Operand, Operand),
     BINARY(BinaryOperator, Operand, Operand, Operand),
+    COPY(Operand, Operand),
+    JUMP(String),
+    JUMPIF(Operand, String),
+    JUMPIFNOT(Operand, String),
+    LABEL(String),
 }
 
 impl fmt::Display for Instruction {
@@ -103,6 +130,11 @@ impl fmt::Display for Instruction {
             Instruction::RETURN(v) => write!(f, "RETURN {}", v),
             Instruction::UNARY(op, src, dest) => write!(f, "{} {} {}", op, src, dest),
             Instruction::BINARY(op, l, r, dest) => write!(f, "{} {} {} {}", op, l, r, dest),
+            Instruction::COPY(src, dest) => write!(f, "COPY {} {}", src, dest),
+            Instruction::JUMP(label) => write!(f, "JUMP {}", label),
+            Instruction::JUMPIF(cond, label) => write!(f, "JUMPIF {} {}", cond, label),
+            Instruction::JUMPIFNOT(cond, label) => write!(f, "JUMPIFNOT {} {}", cond, label),
+            Instruction::LABEL(label) => write!(f, "LABEL {}", label),
         }
     }
 }
@@ -124,12 +156,31 @@ fn generate_instructions(
             parser::Factor::EXPRESSION(expr) => generate_instructions(*expr, instructions),
         },
         parser::Expression::BINARY(lhs, op, rhs) => {
+            let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21)));
             let lhs = generate_instructions(*lhs, instructions);
             let rhs = generate_instructions(*rhs, instructions);
-            let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21)));
-            let op = BinaryOperator::from(op);
-            instructions.push(Instruction::BINARY(op, lhs, rhs, dst.clone()));
-            dst
+
+            if let parser::BinaryOperator::AND | parser::BinaryOperator::OR = op {
+                let isfalse = format!("label.{}", nanoid!(21));
+                let end = format!("label.{}", nanoid!(21));
+                if matches!(op, parser::BinaryOperator::AND) {
+                    instructions.push(Instruction::JUMPIFNOT(lhs, String::from(&isfalse)));
+                    instructions.push(Instruction::JUMPIFNOT(rhs, String::from(&isfalse)));
+                } else {
+                    instructions.push(Instruction::JUMPIF(lhs, String::from(&end)));
+                    instructions.push(Instruction::JUMPIF(rhs, String::from(&end)));
+                }
+                instructions.push(Instruction::COPY(Operand::CONSTANT(1), dst.clone()));
+                instructions.push(Instruction::JUMP(end.clone()));
+                instructions.push(Instruction::LABEL(isfalse));
+                instructions.push(Instruction::COPY(Operand::CONSTANT(0), dst.clone()));
+                instructions.push(Instruction::LABEL(end));
+                dst
+            } else {
+                let op = BinaryOperator::try_from(op).unwrap();
+                instructions.push(Instruction::BINARY(op, lhs, rhs, dst.clone()));
+                dst
+            }
         }
     }
 }

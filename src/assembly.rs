@@ -71,6 +71,7 @@ impl From<tacky::UnaryOperator> for UnaryOperator {
         match op {
             tacky::UnaryOperator::NEGATE => UnaryOperator::NEG,
             tacky::UnaryOperator::COMPLEMENT => UnaryOperator::NOT,
+            _ => todo!(),
         }
     }
 }
@@ -248,6 +249,7 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
                 ));
             }
         },
+        _ => todo!(),
     };
     instructions
 }
