@@ -1,6 +1,8 @@
 use super::parser;
 use nanoid::nanoid;
+use nanoid_dictionary::ALPHANUMERIC;
 use std::fmt;
+use tracing::debug;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
@@ -132,8 +134,8 @@ impl fmt::Display for Instruction {
             Instruction::BINARY(op, l, r, dest) => write!(f, "{} {} {} {}", op, l, r, dest),
             Instruction::COPY(src, dest) => write!(f, "COPY {} {}", src, dest),
             Instruction::JUMP(label) => write!(f, "JUMP {}", label),
-            Instruction::JUMPIF(cond, label) => write!(f, "JUMPIF {} {}", cond, label),
-            Instruction::JUMPIFNOT(cond, label) => write!(f, "JUMPIFNOT {} {}", cond, label),
+            Instruction::JUMPIF(cond, label) => write!(f, "JUMP IF ZERO {} {}", cond, label),
+            Instruction::JUMPIFNOT(cond, label) => write!(f, "JUMP IF NOT ZERO {} {}", cond, label),
             Instruction::LABEL(label) => write!(f, "LABEL {}", label),
         }
     }
@@ -148,7 +150,7 @@ fn generate_instructions(
             parser::Factor::INT(n) => Operand::CONSTANT(n.into()),
             parser::Factor::UNARY(op, exp) => {
                 let src = generate_instructions(parser::Expression::FACTOR(*exp), instructions);
-                let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21)));
+                let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
                 let op = UnaryOperator::from(op);
                 instructions.push(Instruction::UNARY(op, src, dst.clone()));
                 dst
@@ -156,27 +158,40 @@ fn generate_instructions(
             parser::Factor::EXPRESSION(expr) => generate_instructions(*expr, instructions),
         },
         parser::Expression::BINARY(lhs, op, rhs) => {
-            let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21)));
-            let lhs = generate_instructions(*lhs, instructions);
-            let rhs = generate_instructions(*rhs, instructions);
+            let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
 
             if let parser::BinaryOperator::AND | parser::BinaryOperator::OR = op {
-                let isfalse = format!("label.{}", nanoid!(21));
-                let end = format!("label.{}", nanoid!(21));
+                let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+                let lhs = generate_instructions(*lhs, instructions);
+
+                let mut rhs_instructions: Vec<Instruction> = Vec::new();
+                let rhs = generate_instructions(*rhs, &mut rhs_instructions);
+
                 if matches!(op, parser::BinaryOperator::AND) {
-                    instructions.push(Instruction::JUMPIFNOT(lhs, String::from(&isfalse)));
-                    instructions.push(Instruction::JUMPIFNOT(rhs, String::from(&isfalse)));
+                    let isfalse = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+                    instructions.push(Instruction::JUMPIF(lhs, String::from(&isfalse)));
+                    instructions.extend(rhs_instructions);
+                    instructions.push(Instruction::JUMPIF(rhs, String::from(&isfalse)));
+                    instructions.push(Instruction::COPY(Operand::CONSTANT(1), dst.clone()));
+                    instructions.push(Instruction::JUMP(end.clone()));
+                    instructions.push(Instruction::LABEL(isfalse));
+                    instructions.push(Instruction::COPY(Operand::CONSTANT(0), dst.clone()));
+                    instructions.push(Instruction::LABEL(end));
                 } else {
-                    instructions.push(Instruction::JUMPIF(lhs, String::from(&end)));
-                    instructions.push(Instruction::JUMPIF(rhs, String::from(&end)));
+                    let istrue = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+                    instructions.push(Instruction::JUMPIFNOT(lhs, String::from(&istrue)));
+                    instructions.extend(rhs_instructions);
+                    instructions.push(Instruction::JUMPIFNOT(rhs, String::from(&istrue)));
+                    instructions.push(Instruction::COPY(Operand::CONSTANT(0), dst.clone()));
+                    instructions.push(Instruction::JUMP(end.clone()));
+                    instructions.push(Instruction::LABEL(istrue));
+                    instructions.push(Instruction::COPY(Operand::CONSTANT(1), dst.clone()));
+                    instructions.push(Instruction::LABEL(end));
                 }
-                instructions.push(Instruction::COPY(Operand::CONSTANT(1), dst.clone()));
-                instructions.push(Instruction::JUMP(end.clone()));
-                instructions.push(Instruction::LABEL(isfalse));
-                instructions.push(Instruction::COPY(Operand::CONSTANT(0), dst.clone()));
-                instructions.push(Instruction::LABEL(end));
                 dst
             } else {
+                let lhs = generate_instructions(*lhs, instructions);
+                let rhs = generate_instructions(*rhs, instructions);
                 let op = BinaryOperator::try_from(op).unwrap();
                 instructions.push(Instruction::BINARY(op, lhs, rhs, dst.clone()));
                 dst
@@ -195,11 +210,13 @@ impl Function {
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "FUNCTION {}", self.0)?;
-        for instr in &self.1 {
-            writeln!(f, "  {}", instr)?;
-        }
-        writeln!(f, "END FUNCTION")
+        let instrs = self
+            .1
+            .iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>()
+            .join("\n\t");
+        writeln!(f, "FN {}\n\t{}\nEND FN {}", self.0, instrs, self.0)
     }
 }
 
@@ -213,8 +230,10 @@ impl From<parser::Function> for Function {
     fn from(function: parser::Function) -> Self {
         let name = String::from(function.name().as_ref());
         let mut instructions: Vec<Instruction> = Vec::new();
+
         match parser::Statement::from(function) {
             parser::Statement::RETURN(expr) => {
+                debug!("Generating instructions for return expression: {}", expr);
                 let value = generate_instructions(expr, &mut instructions);
                 instructions.push(Instruction::RETURN(value));
             }

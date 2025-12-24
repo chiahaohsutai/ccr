@@ -203,7 +203,7 @@ impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expression::FACTOR(factor) => write!(f, "{}", factor),
-            Expression::BINARY(lhs, op, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
+            Expression::BINARY(l, op, r) => write!(f, "{l} {op} {r}"),
         }
     }
 }
@@ -249,7 +249,7 @@ impl Function {
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "FUNCTION {}\n\t{}\nEND FUNCTION", self.0, self.1)
+        writeln!(f, "FN {}\n\t{}\nEND FN {}", self.0, self.1, self.0)
     }
 }
 
@@ -306,7 +306,7 @@ fn parse_expression(tokens: &mut VecDeque<Token>, precedence: u64) -> Result<Exp
 
     while next
         .as_ref()
-        .is_some_and(|token| token.is_binary_operator() && token.precedence() >= precedence)
+        .is_some_and(|t| t.is_binary_operator() && t.precedence() >= precedence)
     {
         let token = next.unwrap();
         let precedence = token.precedence() + 1;

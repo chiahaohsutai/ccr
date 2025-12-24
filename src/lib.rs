@@ -1,6 +1,6 @@
 use std::{fs, path::Path, process, str::FromStr};
 use tempfile::{Builder, NamedTempFile};
-use tracing::info;
+use tracing::{debug, info};
 
 pub mod assembly;
 pub mod lexer;
@@ -68,25 +68,35 @@ fn compile(input: &Path, stop_after: Option<CompileStep>) -> Result<Option<Named
     };
 
     info!("Lexing...");
+
     let tokens = lexer::lex(&content)?;
+    debug!("Lexed tokens:\n\n{:?}", tokens);
+
     if matches!(stop_after, Some(CompileStep::LEX)) {
         return Ok(None);
     }
 
     info!("Parsing...");
+
     let program = parser::parse(tokens)?;
+    debug!("Parsed program:\n{}", program.to_string());
+
     if matches!(stop_after, Some(CompileStep::PARSE)) {
         return Ok(None);
     };
 
-    let program = tacky::Program::from(program.clone());
+    let tac = tacky::Program::from(program.clone());
+    debug!("Generated tac:\n{}", tac.to_string());
+
     if matches!(stop_after, Some(CompileStep::TACKY)) {
         return Ok(None);
     }
 
     info!("Generating assembly instructions...");
 
-    let assembly = assembly::Program::from(program);
+    let assembly = assembly::Program::from(tac);
+    debug!("Generated assembly:\n{}", assembly.to_string());
+
     if matches!(stop_after, Some(CompileStep::CODEGEN)) {
         return Ok(None);
     };
