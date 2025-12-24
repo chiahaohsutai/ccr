@@ -73,6 +73,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "nanoid",
+ "nanoid-dictionary",
  "regex",
  "tempfile",
  "tracing",
@@ -220,6 +221,12 @@ checksum = "3ffa00dec017b5b1a8b7cf5e2c008bfda1aa7e0697ac1508b491fdf2622fb4d8"
 dependencies = [
  "rand",
 ]
+
+[[package]]
+name = "nanoid-dictionary"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c6e9131c818f6826271c255f7323d1fcc9332c54b7cfb6c664ec506595d5d8e"
 
 [[package]]
 name = "nu-ansi-term"

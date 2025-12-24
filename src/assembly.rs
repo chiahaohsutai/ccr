@@ -9,9 +9,32 @@ enum Register {
     AX,
     DX,
     CX,
-    CL,
     R10,
     R11,
+}
+
+impl Register {
+    fn as_byte(&self) -> String {
+        match self {
+            Register::AX => String::from("%al"),
+            Register::CX => String::from("%cl"),
+            Register::DX => String::from("%dl"),
+            Register::R10 => String::from("%r10b"),
+            Register::R11 => String::from("%r11b"),
+        }
+    }
+}
+
+impl fmt::Display for Register {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Register::AX => write!(f, "%eax"),
+            Register::CX => write!(f, "%ecx"),
+            Register::DX => write!(f, "%edx"),
+            Register::R10 => write!(f, "%r10d"),
+            Register::R11 => write!(f, "%r11d"),
+        }
+    }
 }
 
 // Operands in x86-64 assembly.
@@ -27,14 +50,7 @@ impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Operand::IMM(c) => write!(f, "${c}"),
-            Operand::REG(r) => match r {
-                Register::CL => write!(f, "%cl"),
-                Register::AX => write!(f, "%eax"),
-                Register::CX => write!(f, "%ecx"),
-                Register::DX => write!(f, "%edx"),
-                Register::R10 => write!(f, "%r10d"),
-                Register::R11 => write!(f, "%r11d"),
-            },
+            Operand::REG(r) => write!(f, "{}", r),
             Operand::PSEUDO(name) => panic!("Unexpected pseudo operand: {}", name),
             Operand::STACK(offset) => write!(f, "-{}(%rbp)", offset),
         }
@@ -106,6 +122,21 @@ impl TryFrom<tacky::BinaryOperator> for BinaryOperator {
     }
 }
 
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BinaryOperator::ADD => write!(f, "addl"),
+            BinaryOperator::SUB => write!(f, "subl"),
+            BinaryOperator::MUL => write!(f, "imull"),
+            BinaryOperator::AND => write!(f, "andl"),
+            BinaryOperator::OR => write!(f, "orl"),
+            BinaryOperator::XOR => write!(f, "xorl"),
+            BinaryOperator::SHL => write!(f, "shll"),
+            BinaryOperator::SAR => write!(f, "sarl"),
+        }
+    }
+}
+
 // Conditions for conditional jumps in x86-64 assembly.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Condition {
@@ -115,6 +146,19 @@ enum Condition {
     GREATERTHAN,
     LESSEQUAL,
     GREATEREQUAL,
+}
+
+impl fmt::Display for Condition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Condition::EQUAL => write!(f, "e"),
+            Condition::NOTEQUAL => write!(f, "ne"),
+            Condition::LESSTHAN => write!(f, "l"),
+            Condition::GREATERTHAN => write!(f, "g"),
+            Condition::LESSEQUAL => write!(f, "le"),
+            Condition::GREATEREQUAL => write!(f, "ge"),
+        }
+    }
 }
 
 impl TryFrom<tacky::BinaryOperator> for Condition {
@@ -155,24 +199,29 @@ impl fmt::Display for Instruction {
         match self {
             Instruction::MOV(src, dest) => write!(f, "\tmovl {src}, {dest}"),
             Instruction::ALLOCATE(size) => write!(f, "\tsubq ${size}, %rsp"),
-            Instruction::UNARY(op, operand) => write!(f, "\t{op} {operand}"),
+            Instruction::UNARY(op, oprd) => write!(f, "\t{op} {oprd}"),
             Instruction::RET => write!(f, "\tmovq %rbp, %rsp\n\tpopq %rbp\n\tret"),
             Instruction::CDQ => write!(f, "\tcdq"),
-            Instruction::IDIV(operand) => write!(f, "\tidivl {operand}"),
-            Instruction::BINARY(op, lhs, rhs) => {
-                let op_str = match op {
-                    BinaryOperator::ADD => "addl",
-                    BinaryOperator::SUB => "subl",
-                    BinaryOperator::MUL => "imull",
-                    BinaryOperator::AND => "andl",
-                    BinaryOperator::OR => "orl",
-                    BinaryOperator::XOR => "xorl",
-                    BinaryOperator::SHL => "shll",
-                    BinaryOperator::SAR => "sarl",
-                };
-                write!(f, "\t{} {}, {}", op_str, lhs, rhs)
-            }
-            _ => todo!(),
+            Instruction::IDIV(oprd) => write!(f, "\tidivl {oprd}"),
+            Instruction::BINARY(op, lhs, rhs) => match op {
+                BinaryOperator::SHL | BinaryOperator::SAR => match (lhs, rhs) {
+                    (Operand::REG(r1), Operand::REG(r2)) => {
+                        write!(f, "\t{} {}, {}", op, r1.as_byte(), r2.as_byte())
+                    }
+                    (Operand::REG(r), _) => write!(f, "\t{} {}, {}", op, r.as_byte(), rhs),
+                    (_, Operand::REG(r)) => write!(f, "\t{} {}, {}", op, lhs, r.as_byte()),
+                    _ => write!(f, "\t{} {}, {}", op, lhs, rhs),
+                },
+                _ => write!(f, "\t{} {}, {}", op, lhs, rhs),
+            },
+            Instruction::CMP(lhs, rhs) => write!(f, "\tcmpl {}, {}", lhs, rhs),
+            Instruction::JMP(label) => write!(f, "\tjmp _L.{}", label),
+            Instruction::JMPCC(cond, label) => write!(f, "\tj{} _L.{}", cond, label),
+            Instruction::SETCC(cond, oprd) => match oprd {
+                Operand::REG(r) => write!(f, "\tset{} {}", cond, r.as_byte()),
+                _ => write!(f, "\tset{} {}", cond, oprd),
+            },
+            Instruction::LABEL(label) => write!(f, "_L.{}:", label),
         }
     }
 }
@@ -274,7 +323,7 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
                 let op = BinaryOperator::try_from(op).unwrap();
                 instructions.push(Instruction::MOV(lhs, dest.clone()));
                 instructions.push(Instruction::MOV(rhs, Operand::REG(Register::CX)));
-                instructions.push(Instruction::BINARY(op, Operand::REG(Register::CL), dest));
+                instructions.push(Instruction::BINARY(op, Operand::REG(Register::CX), dest));
             }
             tacky::BinaryOperator::EQUAL
             | tacky::BinaryOperator::NOTEQUAL
