@@ -1,6 +1,8 @@
-# CCR – A C Compiler in Rust  
+# Sandglass
 
-This project presents a full implementation of the compiler described in Nora Sandler’s *[Writing a C Compiler: Build a Real Programming Language from Scratch](https://nostarch.com/writing-c-compiler)*. The compiler is implemented in Rust and supports a subset of the C language, including arithmetic expressions, bitwise operations, control-flow statements, and more. As outlined in the book, the compiler is structured into five compilation stages:
+Sandglass is a C compiler implemented in Rust, based on the curriculum from Nora Sandler’s [Writing a C Compiler: Build a Real Programming Language from Scratch](https://nostarch.com/writing-c-compiler).
+
+This project presents a full implementation of the compiler described in the text. It supports a subset of the C language, including arithmetic expressions, bitwise operations, and control-flow statements. The compiler is structured into five compilation stages:
 
 1. **Lexing (Tokenization)** – Converts the input source code into a stream of tokens.
 2. **Parsing** – Builds an abstract syntax tree (AST) using recursive descent with precedence climbing.
@@ -10,9 +12,7 @@ This project presents a full implementation of the compiler described in Nora Sa
 
 ## Command-Line Interface (CLI)
 
-You can interact with the compiler through a command-line interface (CLI). The CLI allows you to run the compiler normally or stop execution at a specific compilation stage.
-
-### Example Usage
+You can interact with the compiler through a command-line interface (CLI) to compile C programs into binaries or stop execution at specific stages. Note that the compiler targets the x86_64 architecture; therefore, your shell instance must be running on an x86_64 host to successfully compile and execute the generated binaries.
 
 ```bash
 # Display available CLI options and flags
@@ -37,8 +37,8 @@ cargo run -- --codegen path/to/my_program.c
 
 To build and run this project, ensure the following command-line tools are installed:
 
-- The Rust toolchain, installed via `rustup`, with `cargo`
-- A system C compiler (`gcc` or `clang`, accessible as `gcc`)
+* The Rust toolchain, installed via `rustup`, with `cargo`
+* A system C compiler (`gcc` or `clang`, accessible as `gcc`)
 
 ```bash
 # Build the project
