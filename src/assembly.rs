@@ -106,14 +106,46 @@ impl TryFrom<tacky::BinaryOperator> for BinaryOperator {
     }
 }
 
+// Conditions for conditional jumps in x86-64 assembly.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Condition {
+    EQUAL,
+    NOTEQUAL,
+    LESSTHAN,
+    GREATERTHAN,
+    LESSEQUAL,
+    GREATEREQUAL,
+}
+
+impl TryFrom<tacky::BinaryOperator> for Condition {
+    type Error = String;
+
+    fn try_from(op: tacky::BinaryOperator) -> Result<Self, Self::Error> {
+        match op {
+            tacky::BinaryOperator::EQUAL => Ok(Condition::EQUAL),
+            tacky::BinaryOperator::NOTEQUAL => Ok(Condition::NOTEQUAL),
+            tacky::BinaryOperator::LESSTHAN => Ok(Condition::LESSTHAN),
+            tacky::BinaryOperator::GREATERTHAN => Ok(Condition::GREATERTHAN),
+            tacky::BinaryOperator::LESSEQUAL => Ok(Condition::LESSEQUAL),
+            tacky::BinaryOperator::GREATEREQUAL => Ok(Condition::GREATEREQUAL),
+            _ => Err(format!("Unsupported condition operator: {:?}", op)),
+        }
+    }
+}
+
 // Instructions in x86-64 assembly.
 #[derive(Debug, Clone, PartialEq)]
 enum Instruction {
     MOV(Operand, Operand),
     UNARY(UnaryOperator, Operand),
+    CMP(Operand, Operand),
     BINARY(BinaryOperator, Operand, Operand),
     IDIV(Operand),
     CDQ,
+    JMP(String),
+    JMPCC(Condition, String),
+    SETCC(Condition, Operand),
+    LABEL(String),
     ALLOCATE(u64),
     RET,
 }
@@ -140,6 +172,7 @@ impl fmt::Display for Instruction {
                 };
                 write!(f, "\t{} {}, {}", op_str, lhs, rhs)
             }
+            _ => todo!(),
         }
     }
 }
@@ -202,6 +235,12 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
             instructions.push(Instruction::MOV(op, Operand::REG(Register::AX)));
             instructions.push(Instruction::RET);
         }
+        tacky::Instruction::UNARY(tacky::UnaryOperator::NOT, src, dst) => {
+            let dst = Operand::from(dst);
+            instructions.push(Instruction::CMP(Operand::IMM(0), Operand::from(src)));
+            instructions.push(Instruction::MOV(Operand::IMM(0), dst.clone()));
+            instructions.push(Instruction::SETCC(Condition::EQUAL, dst));
+        }
         tacky::Instruction::UNARY(op, src, dest) => {
             let op = UnaryOperator::from(op);
             let src = Operand::from(src);
@@ -237,19 +276,42 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
                 instructions.push(Instruction::MOV(rhs, Operand::REG(Register::CX)));
                 instructions.push(Instruction::BINARY(op, Operand::REG(Register::CL), dest));
             }
+            tacky::BinaryOperator::EQUAL
+            | tacky::BinaryOperator::NOTEQUAL
+            | tacky::BinaryOperator::LESSTHAN
+            | tacky::BinaryOperator::GREATERTHAN
+            | tacky::BinaryOperator::LESSEQUAL
+            | tacky::BinaryOperator::GREATEREQUAL => {
+                let dst = Operand::from(dest);
+                let op = Condition::try_from(op).unwrap();
+                instructions.push(Instruction::CMP(Operand::from(rhs), Operand::from(lhs)));
+                instructions.push(Instruction::MOV(Operand::IMM(0), dst.clone()));
+                instructions.push(Instruction::SETCC(op, dst));
+            }
             _ => {
-                instructions.push(Instruction::MOV(
-                    Operand::from(lhs),
-                    Operand::from(dest.clone()),
-                ));
-                instructions.push(Instruction::BINARY(
-                    BinaryOperator::try_from(op).unwrap(),
-                    Operand::from(rhs),
-                    Operand::from(dest),
-                ));
+                let dst = Operand::from(dest);
+                let op = BinaryOperator::try_from(op).unwrap();
+                instructions.push(Instruction::MOV(Operand::from(lhs), dst.clone()));
+                instructions.push(Instruction::BINARY(op, Operand::from(rhs), dst));
             }
         },
-        _ => todo!(),
+        tacky::Instruction::JUMPIF(val, tar) => {
+            instructions.push(Instruction::CMP(Operand::IMM(0), Operand::from(val)));
+            instructions.push(Instruction::JMPCC(Condition::EQUAL, tar));
+        }
+        tacky::Instruction::JUMPIFNOT(val, tar) => {
+            instructions.push(Instruction::CMP(Operand::IMM(0), Operand::from(val)));
+            instructions.push(Instruction::JMPCC(Condition::NOTEQUAL, tar));
+        }
+        tacky::Instruction::JUMP(label) => {
+            instructions.push(Instruction::JMP(label));
+        }
+        tacky::Instruction::LABEL(label) => {
+            instructions.push(Instruction::LABEL(label));
+        }
+        tacky::Instruction::COPY(lhs, rhs) => {
+            instructions.push(Instruction::MOV(Operand::from(lhs), Operand::from(rhs)));
+        }
     };
     instructions
 }
@@ -284,6 +346,19 @@ fn replace_pseudo_operands(instruction: Instruction, offsets: &mut StackOffsets)
         }
         Instruction::IDIV(Operand::PSEUDO(name)) => {
             Instruction::IDIV(Operand::STACK(offsets.get(&name)))
+        }
+        Instruction::CMP(Operand::PSEUDO(n1), Operand::PSEUDO(n2)) => Instruction::CMP(
+            Operand::STACK(offsets.get(&n1)),
+            Operand::STACK(offsets.get(&n2)),
+        ),
+        Instruction::CMP(op1, Operand::PSEUDO(name)) => {
+            Instruction::CMP(op1, Operand::STACK(offsets.get(&name)))
+        }
+        Instruction::CMP(Operand::PSEUDO(name), op2) => {
+            Instruction::CMP(Operand::STACK(offsets.get(&name)), op2)
+        }
+        Instruction::SETCC(cond, Operand::PSEUDO(name)) => {
+            Instruction::SETCC(cond, Operand::STACK(offsets.get(&name)))
         }
         _ => instruction,
     }
@@ -324,6 +399,23 @@ fn fix_invalid_instruction(instruction: Instruction) -> Vec<Instruction> {
                 Operand::REG(Register::R11),
                 Operand::STACK(n),
             ));
+        }
+        Instruction::CMP(Operand::STACK(n1), Operand::STACK(n2)) => {
+            instructions.push(Instruction::MOV(
+                Operand::STACK(n1),
+                Operand::REG(Register::R10),
+            ));
+            instructions.push(Instruction::CMP(
+                Operand::REG(Register::R10),
+                Operand::STACK(n2),
+            ));
+        }
+        Instruction::CMP(lhs, Operand::IMM(val)) => {
+            instructions.push(Instruction::MOV(
+                Operand::IMM(val),
+                Operand::REG(Register::R11),
+            ));
+            instructions.push(Instruction::CMP(lhs, Operand::REG(Register::R11)));
         }
         Instruction::BINARY(op, Operand::STACK(n1), Operand::STACK(n2)) => {
             instructions.push(Instruction::MOV(
