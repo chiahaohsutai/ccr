@@ -2,7 +2,6 @@ use super::parser;
 use nanoid::nanoid;
 use nanoid_dictionary::ALPHANUMERIC;
 use std::fmt;
-use tracing::debug;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
@@ -147,7 +146,7 @@ fn generate_instructions(
 ) -> Operand {
     match expression {
         parser::Expression::FACTOR(factor) => match factor {
-            parser::Factor::INT(n) => Operand::CONSTANT(n.into()),
+            parser::Factor::INT(n) => Operand::CONSTANT(n),
             parser::Factor::UNARY(op, exp) => {
                 let src = generate_instructions(parser::Expression::FACTOR(*exp), instructions);
                 let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
@@ -156,6 +155,7 @@ fn generate_instructions(
                 dst
             }
             parser::Factor::EXPRESSION(expr) => generate_instructions(*expr, instructions),
+            _ => todo!(),
         },
         parser::Expression::BINARY(lhs, op, rhs) => {
             let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
@@ -197,6 +197,7 @@ fn generate_instructions(
                 dst
             }
         }
+        _ => todo!(),
     }
 }
 
@@ -228,17 +229,18 @@ impl From<Function> for Vec<Instruction> {
 
 impl From<parser::Function> for Function {
     fn from(function: parser::Function) -> Self {
-        let name = String::from(function.name().as_ref());
-        let mut instructions: Vec<Instruction> = Vec::new();
+        todo!()
+        // let name = String::from(function.name().as_ref());
+        // let mut instructions: Vec<Instruction> = Vec::new();
 
-        match parser::Statement::from(function) {
-            parser::Statement::RETURN(expr) => {
-                debug!("Generating instructions for return expression: {}", expr);
-                let value = generate_instructions(expr, &mut instructions);
-                instructions.push(Instruction::RETURN(value));
-            }
-        };
-        Function(name, instructions)
+        // match parser::Statement::from(function) {
+        //     parser::Statement::RETURN(expr) => {
+        //         debug!("Generating instructions for return expression: {}", expr);
+        //         let value = generate_instructions(expr, &mut instructions);
+        //         instructions.push(Instruction::RETURN(value));
+        //     }
+        // };
+        // Function(name, instructions)
     }
 }
 

@@ -198,10 +198,12 @@ impl Token {
                 | Token::OPERATOR(Operator::GREATERTHAN)
                 | Token::OPERATOR(Operator::LESSEQUAL)
                 | Token::OPERATOR(Operator::GREATEREQUAL)
+                | Token::OPERATOR(Operator::ASSIGNMENT)
         )
     }
     pub fn precedence(&self) -> u64 {
         match self {
+            Self::OPERATOR(Operator::ASSIGNMENT) => 1,
             Self::OPERATOR(Operator::OR) => 5,
             Self::OPERATOR(Operator::AND) => 10,
             Self::OPERATOR(Operator::BITWISEOR) => 15,
