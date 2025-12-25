@@ -24,6 +24,7 @@ pub enum Operator {
     GREATERTHAN,
     LESSEQUAL,
     GREATEREQUAL,
+    ASSIGNMENT,
 }
 
 impl FromStr for Operator {
@@ -52,6 +53,7 @@ impl FromStr for Operator {
             ">" => Ok(Operator::GREATERTHAN),
             "<=" => Ok(Operator::LESSEQUAL),
             ">=" => Ok(Operator::GREATEREQUAL),
+            "=" => Ok(Operator::ASSIGNMENT),
             _ => Err(format!("Unknown operator: {}", s)),
         }
     }
@@ -81,6 +83,7 @@ impl fmt::Display for Operator {
             Operator::GREATERTHAN => write!(f, ">"),
             Operator::LESSEQUAL => write!(f, "<="),
             Operator::GREATEREQUAL => write!(f, ">="),
+            Operator::ASSIGNMENT => write!(f, "="),
         }
     }
 }

@@ -6,7 +6,7 @@ use tracing::info;
 const IDENTIFIER_PATTERN: &str = r"[a-zA-Z]\w*\b";
 const CONSTANT_PATTERN: &str = r"[0-9]+\b";
 const KEYWORD_PATTERN: &str = r"int|void|return\b";
-const OPERATOR_PATTERN: &str = r"<=|>=|--|<<|>>|&&|\|\||==|!=|[\-~\+\*\/%&\|\^!><]";
+const OPERATOR_PATTERN: &str = r"<=|>=|--|<<|>>|&&|\|\||==|!=|[\-~\+\*\/%&\|\^!><=]";
 const DELIMITER_PATTERN: &str = r"[\(\);\{\}]";
 
 #[derive(Debug, PartialEq, Clone)]
