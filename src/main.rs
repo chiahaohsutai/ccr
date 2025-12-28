@@ -21,7 +21,7 @@ fn build_cli() -> Command {
     ];
 
     let stop_after = ArgGroup::new("stop_after")
-        .args(["lex", "parse", "tacky", "codegen"])
+        .args(["lex", "parse", "tacky", "codegen", "validate"])
         .multiple(false)
         .required(false);
 

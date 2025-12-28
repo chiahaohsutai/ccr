@@ -1,47 +1,23 @@
-use std::{fs, path::Path, process, str::FromStr};
-use tempfile::{Builder, NamedTempFile};
-use tracing::{debug, info};
+use std::{ffi, fs, path, process, str};
+use tempfile::NamedTempFile;
 
-pub mod assembly;
+pub mod analysis;
+pub mod codegen;
 pub mod lexer;
 pub mod parser;
 pub mod tacky;
 pub mod tokens;
 
-/// Preprocess the .c file into a .i file.
-fn preprocess(input: &Path) -> Result<NamedTempFile, String> {
-    info!("Preprocessing with gcc...");
-
-    let tmp = Builder::new()
-        .suffix(".i")
-        .tempfile()
-        .map_err(|e| format!("Failed to create temp file for preprocessed output: {e}"))?;
-
-    let status = process::Command::new("gcc")
-        .args(["-E", "-P"])
-        .arg(input)
-        .arg("-o")
-        .arg(tmp.path())
-        .status()
-        .map_err(|e| format!("Preprocessing failed: {e}"))?;
-
-    if status.success() {
-        Ok(tmp)
-    } else {
-        Err(format!("GCC preprocessing failed with status: {status}"))
-    }
-}
-
-/// Compilation steps where the compiler can stop early.
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum CompileStep {
     LEX,
     PARSE,
     CODEGEN,
     TACKY,
+    VALIDATE,
 }
 
-impl FromStr for CompileStep {
+impl str::FromStr for CompileStep {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -50,104 +26,118 @@ impl FromStr for CompileStep {
             "parse" => Ok(CompileStep::PARSE),
             "codegen" => Ok(CompileStep::CODEGEN),
             "tacky" => Ok(CompileStep::TACKY),
+            "validate" => Ok(CompileStep::VALIDATE),
             _ => Err(format!("Unknown compile step: {}", s)),
         }
     }
 }
 
-/// Compile the preprocessed .i file, optionally stopping after a specified step.
-fn compile(input: &Path, stop_after: Option<CompileStep>) -> Result<Option<NamedTempFile>, String> {
-    info!("Compiling...");
-
-    if input.extension().and_then(|s| s.to_str()).unwrap_or("") != "i" {
-        return Err("Input file must have a .i extension".to_string());
-    };
-    let content = match fs::read_to_string(input) {
-        Ok(c) => String::from(c.trim()),
-        Err(e) => return Err(format!("Failed to read input file: {e}")),
-    };
-
-    info!("Lexing...");
+fn compile<T: AsRef<path::Path>>(
+    input: T,
+    stop_after: Option<CompileStep>,
+) -> Result<Option<AssemblyFile>, String> {
+    let content = fs::read_to_string(input).map_err(|e| e.to_string())?;
 
     let tokens = lexer::lex(&content)?;
-    debug!("Lexed tokens:\n\n{:?}", tokens);
-
     if matches!(stop_after, Some(CompileStep::LEX)) {
         return Ok(None);
     }
 
-    info!("Parsing...");
-
     let program = parser::parse(tokens)?;
-    debug!("Parsed program:\n{}", program.to_string());
-
     if matches!(stop_after, Some(CompileStep::PARSE)) {
         return Ok(None);
     };
 
     let tac = tacky::Program::from(program.clone());
-    debug!("Generated tac:\n{}", tac.to_string());
-
     if matches!(stop_after, Some(CompileStep::TACKY)) {
         return Ok(None);
     }
 
-    info!("Generating assembly instructions...");
-
-    let assembly = assembly::Program::from(tac);
-    debug!("Generated assembly:\n{}", assembly.to_string());
-
+    let instructions = codegen::Program::from(tac);
     if matches!(stop_after, Some(CompileStep::CODEGEN)) {
         return Ok(None);
     };
 
-    info!("Writing assembly to temporary .s file...");
+    let file: AssemblyFile = AssemblyFile::new()?;
+    fs::write(&file, instructions.to_string()).map_err(|e| e.to_string())?;
 
-    let tmp = match Builder::new().suffix(".s").tempfile() {
-        Ok(file) => file,
-        Err(e) => Err(format!("Failed to create assembly output file: {e}"))?,
-    };
-    match fs::write(tmp.path(), assembly.to_string()) {
-        Ok(_) => {
-            info!("Assembly written to {}", tmp.path().display());
-            Ok(Some(tmp))
+    Ok(Some(file))
+}
+
+#[derive(Debug)]
+struct AssemblyFile(NamedTempFile);
+
+impl AssemblyFile {
+    fn new() -> Result<Self, String> {
+        match NamedTempFile::with_suffix(".s") {
+            Ok(file) => Ok(AssemblyFile(file)),
+            Err(err) => Err(format!("Failed to create intermediate file: {err}")),
         }
-        Err(e) => Err(format!("Failed to write assembly to file: {e}")),
     }
 }
 
-/// Link the generated assembly into an executable.
-fn link(input: &Path, output: &Path) -> Result<(), String> {
-    info!("Linking with gcc...");
+impl AsRef<ffi::OsStr> for AssemblyFile {
+    fn as_ref(&self) -> &ffi::OsStr {
+        self.0.path().as_os_str()
+    }
+}
 
-    let status = process::Command::new("gcc")
-        .arg(input)
-        .arg("-o")
-        .arg(output)
-        .status()
-        .map_err(|e| format!("GCC command failed: {}", e))?;
+impl AsRef<path::Path> for AssemblyFile {
+    fn as_ref(&self) -> &path::Path {
+        self.0.path()
+    }
+}
 
-    if status.success() {
-        info!("Linking completed successfully.");
-        Ok(())
-    } else {
-        Err(format!("GCC linking failed with status: {}", status))
+#[derive(Debug)]
+struct IntermediateFile(NamedTempFile);
+
+impl IntermediateFile {
+    fn new() -> Result<Self, String> {
+        match NamedTempFile::with_suffix(".i") {
+            Ok(file) => Ok(IntermediateFile(file)),
+            Err(err) => Err(format!("Failed to create assembly file: {err}")),
+        }
+    }
+}
+
+impl AsRef<ffi::OsStr> for IntermediateFile {
+    fn as_ref(&self) -> &ffi::OsStr {
+        self.0.path().as_os_str()
+    }
+}
+
+impl AsRef<path::Path> for IntermediateFile {
+    fn as_ref(&self) -> &path::Path {
+        self.0.path()
     }
 }
 
 /// Build the C source file into an executable, optionally stopping after a specified step.
-pub fn build(input: &Path, stop_after: Option<CompileStep>) -> Result<(), String> {
-    info!("Building...");
+pub fn build(input: &path::Path, stop_after: Option<CompileStep>) -> Result<(), String> {
+    let inter: IntermediateFile = IntermediateFile::new()?;
 
-    let name = match input.file_stem() {
-        Some(stem) => stem,
-        None => Err("Failed to get input file stem.")?,
-    };
-    let temp = preprocess(input);
+    let mut cmd = process::Command::new("gcc");
+    let cmd = cmd.args(["-E", "-P"]).arg(input).arg("-o").arg(&inter);
 
-    if let Some(src) = compile(temp?.path(), stop_after)? {
-        let output = input.parent().unwrap_or(Path::new("/")).join(name);
-        link(src.path(), &output)?;
+    let inter = match cmd.status() {
+        Ok(status) if status.success() => Ok(inter),
+        Ok(status) => Err(format!("Preprocessing failed with exit status: {status}")),
+        Err(e) => Err(format!("Failed to execute preprocessing command: {e}")),
     };
-    Ok(())
+
+    match compile(inter?, stop_after)? {
+        Some(file) => {
+            let out = input.parent().unwrap().join(input.file_name().unwrap());
+
+            let mut cmd = process::Command::new("gcc");
+            let cmd = cmd.arg(file).arg("-o").arg(out);
+
+            match cmd.status() {
+                Ok(status) if status.success() => Ok(()),
+                Ok(status) => Err(format!("Linking failed with exit status: {status}")),
+                Err(err) => Err(format!("Linking command failed: {err}")),
+            }
+        }
+        None => Ok(()),
+    }
 }
