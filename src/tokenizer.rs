@@ -42,7 +42,7 @@ impl Operator {
 
     fn is_unary(&self) -> bool {
         match self {
-            Self::DECREMENT | Self::NEGATION | Self::COMPLEMENT | Self::NOT => true,
+            Self::DECREMENT | Self::COMPLEMENT | Self::NOT => true,
             _ => false,
         }
     }
