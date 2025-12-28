@@ -2,7 +2,7 @@ use core::fmt;
 use std::collections::VecDeque;
 use tracing::info;
 
-use super::tokens::{self, Token};
+use super::tokenizer::{self, Token};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
@@ -21,14 +21,14 @@ impl fmt::Display for UnaryOperator {
     }
 }
 
-impl TryFrom<tokens::Operator> for UnaryOperator {
+impl TryFrom<tokenizer::Operator> for UnaryOperator {
     type Error = String;
 
-    fn try_from(op: tokens::Operator) -> Result<Self, Self::Error> {
+    fn try_from(op: tokenizer::Operator) -> Result<Self, Self::Error> {
         match op {
-            tokens::Operator::NEGATION => Ok(UnaryOperator::NEGATE),
-            tokens::Operator::COMPLEMENT => Ok(UnaryOperator::COMPLEMENT),
-            tokens::Operator::NOT => Ok(UnaryOperator::NOT),
+            tokenizer::Operator::NEGATION => Ok(UnaryOperator::NEGATE),
+            tokenizer::Operator::COMPLEMENT => Ok(UnaryOperator::COMPLEMENT),
+            tokenizer::Operator::NOT => Ok(UnaryOperator::NOT),
             _ => Err(format!("Operator '{op}' is not a unary operator.")),
         }
     }
@@ -94,30 +94,30 @@ impl fmt::Display for BinaryOperator {
     }
 }
 
-impl TryFrom<tokens::Operator> for BinaryOperator {
+impl TryFrom<tokenizer::Operator> for BinaryOperator {
     type Error = String;
 
-    fn try_from(op: tokens::Operator) -> Result<Self, Self::Error> {
+    fn try_from(op: tokenizer::Operator) -> Result<Self, Self::Error> {
         match op {
-            tokens::Operator::ADDITION => Ok(BinaryOperator::ADD),
-            tokens::Operator::NEGATION => Ok(BinaryOperator::SUBTRACT),
-            tokens::Operator::PRODUCT => Ok(BinaryOperator::MULTIPLY),
-            tokens::Operator::DIVISION => Ok(BinaryOperator::DIVIDE),
-            tokens::Operator::REMAINDER => Ok(BinaryOperator::REMAINDER),
-            tokens::Operator::BITWISEAND => Ok(BinaryOperator::BITWISEAND),
-            tokens::Operator::BITWISEOR => Ok(BinaryOperator::BITWISEOR),
-            tokens::Operator::BITWISEXOR => Ok(BinaryOperator::BITWISEXOR),
-            tokens::Operator::LEFTSHIFT => Ok(BinaryOperator::LEFTSHIFT),
-            tokens::Operator::RIGHTSHIFT => Ok(BinaryOperator::RIGHTSHIFT),
-            tokens::Operator::AND => Ok(BinaryOperator::AND),
-            tokens::Operator::OR => Ok(BinaryOperator::OR),
-            tokens::Operator::EQUAL => Ok(BinaryOperator::EQUAL),
-            tokens::Operator::NOTEQUAL => Ok(BinaryOperator::NOTEQUAL),
-            tokens::Operator::LESSTHAN => Ok(BinaryOperator::LESSTHAN),
-            tokens::Operator::GREATERTHAN => Ok(BinaryOperator::GREATERTHAN),
-            tokens::Operator::LESSEQUAL => Ok(BinaryOperator::LESSEQUAL),
-            tokens::Operator::GREATEREQUAL => Ok(BinaryOperator::GREATEREQUAL),
-            tokens::Operator::ASSIGNMENT => Ok(BinaryOperator::ASSIGNMENT),
+            tokenizer::Operator::ADDITION => Ok(BinaryOperator::ADD),
+            tokenizer::Operator::NEGATION => Ok(BinaryOperator::SUBTRACT),
+            tokenizer::Operator::PRODUCT => Ok(BinaryOperator::MULTIPLY),
+            tokenizer::Operator::DIVISION => Ok(BinaryOperator::DIVIDE),
+            tokenizer::Operator::REMAINDER => Ok(BinaryOperator::REMAINDER),
+            tokenizer::Operator::BITWISEAND => Ok(BinaryOperator::BITWISEAND),
+            tokenizer::Operator::BITWISEOR => Ok(BinaryOperator::BITWISEOR),
+            tokenizer::Operator::BITWISEXOR => Ok(BinaryOperator::BITWISEXOR),
+            tokenizer::Operator::LEFTSHIFT => Ok(BinaryOperator::LEFTSHIFT),
+            tokenizer::Operator::RIGHTSHIFT => Ok(BinaryOperator::RIGHTSHIFT),
+            tokenizer::Operator::AND => Ok(BinaryOperator::AND),
+            tokenizer::Operator::OR => Ok(BinaryOperator::OR),
+            tokenizer::Operator::EQUAL => Ok(BinaryOperator::EQUAL),
+            tokenizer::Operator::NOTEQUAL => Ok(BinaryOperator::NOTEQUAL),
+            tokenizer::Operator::LESSTHAN => Ok(BinaryOperator::LESSTHAN),
+            tokenizer::Operator::GREATERTHAN => Ok(BinaryOperator::GREATERTHAN),
+            tokenizer::Operator::LESSEQUAL => Ok(BinaryOperator::LESSEQUAL),
+            tokenizer::Operator::GREATEREQUAL => Ok(BinaryOperator::GREATEREQUAL),
+            tokenizer::Operator::ASSIGNMENT => Ok(BinaryOperator::ASSIGNMENT),
             _ => Err(format!("Operator '{op}' is not a binary operator.")),
         }
     }
@@ -246,23 +246,23 @@ fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Factor, String> {
         Some(Token::IDENTIFIER(name)) => Ok(Factor::IDENTIFIER(name)),
         Some(Token::CONSTANT(value)) => Ok(Factor::INT(value)),
         Some(Token::OPERATOR(op)) => match op {
-            tokens::Operator::NEGATION => {
+            tokenizer::Operator::NEGATION => {
                 let factor = parse_factor(tokens)?;
                 Ok(Factor::UNARY(UnaryOperator::NEGATE, Box::new(factor)))
             }
-            tokens::Operator::COMPLEMENT => {
+            tokenizer::Operator::COMPLEMENT => {
                 let factor = parse_factor(tokens)?;
                 Ok(Factor::UNARY(UnaryOperator::COMPLEMENT, Box::new(factor)))
             }
-            tokens::Operator::NOT => {
+            tokenizer::Operator::NOT => {
                 let factor = parse_factor(tokens)?;
                 Ok(Factor::UNARY(UnaryOperator::NOT, Box::new(factor)))
             }
             _ => Err(format!("Unexpected operator '{}' in factor.", op)),
         },
-        Some(Token::DELIMITER(tokens::Delimiter::LPAREN)) => {
+        Some(Token::DELIMITER(tokenizer::Delimiter::LPAREN)) => {
             let expr = parse_expression(tokens, 0)?;
-            if let Some(Token::DELIMITER(tokens::Delimiter::RPAREN)) = tokens.pop_front() {
+            if let Some(Token::DELIMITER(tokenizer::Delimiter::RPAREN)) = tokens.pop_front() {
                 Ok(Factor::EXPRESSION(Box::new(expr)))
             } else {
                 Err(String::from("Expected ')' after expression."))
@@ -284,7 +284,7 @@ fn parse_expression(tokens: &mut VecDeque<Token>, precedence: u64) -> Result<Exp
         let token = next.unwrap();
         let curr_precedence = token.precedence();
 
-        if let Token::OPERATOR(tokens::Operator::ASSIGNMENT) = token {
+        if let Token::OPERATOR(tokenizer::Operator::ASSIGNMENT) = token {
             let right = parse_expression(tokens, curr_precedence)?;
             left = Expression::BINARY(Box::new(left), BinaryOperator::ASSIGNMENT, Box::new(right));
         } else {
@@ -306,23 +306,23 @@ fn parse_expression(tokens: &mut VecDeque<Token>, precedence: u64) -> Result<Exp
 /// Parses block item production rule.
 fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem, String> {
     match tokens.pop_front() {
-        Some(Token::DELIMITER(tokens::Delimiter::SEMICOLON)) => {
+        Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
             Ok(BlockItem::Statement(Statement::NULL))
         }
-        Some(Token::KEYWORD(tokens::Keyword::INT)) => {
+        Some(Token::KEYWORD(tokenizer::Keyword::INT)) => {
             let name = match tokens.pop_front() {
                 Some(Token::IDENTIFIER(id)) => Ok(id),
                 None => Err(String::from("Unexpected end of input.")),
                 _ => Err(String::from("Expected identifier after 'int'.")),
             }?;
             match tokens.pop_front() {
-                Some(Token::DELIMITER(tokens::Delimiter::SEMICOLON)) => {
+                Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
                     Ok(BlockItem::Declaration(Declaration(name, None)))
                 }
-                Some(Token::OPERATOR(tokens::Operator::ASSIGNMENT)) => {
+                Some(Token::OPERATOR(tokenizer::Operator::ASSIGNMENT)) => {
                     let expr = parse_expression(tokens, 0)?;
                     match tokens.pop_front() {
-                        Some(Token::DELIMITER(tokens::Delimiter::SEMICOLON)) => {
+                        Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
                             Ok(BlockItem::Declaration(Declaration(name, Some(expr))))
                         }
                         _ => Err(String::from("Expected ';' after declaration.")),
@@ -331,10 +331,12 @@ fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem, String> {
                 _ => Err(String::from("Expected ';' or '=' after variable name.")),
             }
         }
-        Some(Token::KEYWORD(tokens::Keyword::RETURN)) => {
+        Some(Token::KEYWORD(tokenizer::Keyword::RETURN)) => {
             let expr = parse_expression(tokens, 0)?;
             let stmt = match tokens.pop_front() {
-                Some(Token::DELIMITER(tokens::Delimiter::SEMICOLON)) => Ok(Statement::RETURN(expr)),
+                Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
+                    Ok(Statement::RETURN(expr))
+                }
                 _ => Err(String::from("Expected ';' after return expression.")),
             };
             stmt.map(BlockItem::Statement)
@@ -343,7 +345,7 @@ fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem, String> {
             tokens.push_front(token);
             let expr = parse_expression(tokens, 0)?;
             match tokens.pop_front() {
-                Some(Token::DELIMITER(tokens::Delimiter::SEMICOLON)) => {
+                Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
                     Ok(BlockItem::Statement(Statement::EXPRESSION(expr)))
                 }
                 _ => Err(String::from("Expected ';' after expression statement.")),
@@ -356,7 +358,7 @@ fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem, String> {
 /// Parses function production rule.
 fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function, String> {
     match tokens.pop_front() {
-        Some(Token::KEYWORD(tokens::Keyword::INT)) => {
+        Some(Token::KEYWORD(tokenizer::Keyword::INT)) => {
             let name = match tokens.pop_front() {
                 Some(Token::IDENTIFIER(name)) => Ok(name),
                 None => Err(String::from("Unexpected end of input.")),
@@ -364,15 +366,15 @@ fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function, String> {
             }?;
             match (tokens.pop_front(), tokens.pop_front(), tokens.pop_front()) {
                 (
-                    Some(Token::DELIMITER(tokens::Delimiter::LPAREN)),
-                    Some(Token::KEYWORD(tokens::Keyword::VOID)),
-                    Some(Token::DELIMITER(tokens::Delimiter::RPAREN)),
+                    Some(Token::DELIMITER(tokenizer::Delimiter::LPAREN)),
+                    Some(Token::KEYWORD(tokenizer::Keyword::VOID)),
+                    Some(Token::DELIMITER(tokenizer::Delimiter::RPAREN)),
                 ) => match tokens.pop_front() {
-                    Some(Token::DELIMITER(tokens::Delimiter::LBRACE)) => {
+                    Some(Token::DELIMITER(tokenizer::Delimiter::LBRACE)) => {
                         let mut block: Vec<BlockItem> = Vec::new();
                         loop {
                             let next = tokens.front();
-                            if let Some(Token::DELIMITER(tokens::Delimiter::RBRACE)) = next {
+                            if let Some(Token::DELIMITER(tokenizer::Delimiter::RBRACE)) = next {
                                 tokens.pop_front();
                                 break Ok(Function(name, block));
                             }

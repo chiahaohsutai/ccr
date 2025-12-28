@@ -1,44 +1,77 @@
-use std::{ffi, fs, path, process, str};
+use std::{ffi, fs, path, process};
 use tempfile::NamedTempFile;
 
 pub mod analysis;
 pub mod codegen;
-pub mod lexer;
 pub mod parser;
 pub mod tacky;
-pub mod tokens;
+pub mod tokenizer;
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum IntermediateFileType {
+    PREPROCESSED,
+    ASSEMBLY,
+}
+
+impl AsRef<str> for IntermediateFileType {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::PREPROCESSED => ".i",
+            Self::ASSEMBLY => ".s",
+        }
+    }
+}
+
+impl AsRef<ffi::OsStr> for IntermediateFileType {
+    fn as_ref(&self) -> &ffi::OsStr {
+        let suffix: &str = self.as_ref();
+        match self {
+            Self::PREPROCESSED => ffi::OsStr::new(suffix),
+            Self::ASSEMBLY => ffi::OsStr::new(suffix),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct IntermediateFile(NamedTempFile<fs::File>);
+
+impl IntermediateFile {
+    fn new(filetype: IntermediateFileType) -> Result<Self, String> {
+        match NamedTempFile::with_suffix(&filetype) {
+            Ok(file) => Ok(IntermediateFile(file)),
+            Err(err) => Err(format!("Failed to create intermediate file: {err}")),
+        }
+    }
+}
+
+impl AsRef<ffi::OsStr> for IntermediateFile {
+    fn as_ref(&self) -> &ffi::OsStr {
+        self.0.path().as_os_str()
+    }
+}
+
+impl AsRef<path::Path> for IntermediateFile {
+    fn as_ref(&self) -> &path::Path {
+        self.0.path()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum CompileStep {
     LEX,
     PARSE,
-    CODEGEN,
     TACKY,
+    CODEGEN,
     VALIDATE,
-}
-
-impl str::FromStr for CompileStep {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "lex" => Ok(CompileStep::LEX),
-            "parse" => Ok(CompileStep::PARSE),
-            "codegen" => Ok(CompileStep::CODEGEN),
-            "tacky" => Ok(CompileStep::TACKY),
-            "validate" => Ok(CompileStep::VALIDATE),
-            _ => Err(format!("Unknown compile step: {}", s)),
-        }
-    }
 }
 
 fn compile<T: AsRef<path::Path>>(
     input: T,
     stop_after: Option<CompileStep>,
-) -> Result<Option<AssemblyFile>, String> {
+) -> Result<Option<IntermediateFile>, String> {
     let content = fs::read_to_string(input).map_err(|e| e.to_string())?;
 
-    let tokens = lexer::lex(&content)?;
+    let tokens = tokenizer::tokenize(&content)?;
     if matches!(stop_after, Some(CompileStep::LEX)) {
         return Ok(None);
     }
@@ -58,63 +91,15 @@ fn compile<T: AsRef<path::Path>>(
         return Ok(None);
     };
 
-    let file: AssemblyFile = AssemblyFile::new()?;
+    let file: IntermediateFile = IntermediateFile::new(IntermediateFileType::ASSEMBLY)?;
     fs::write(&file, instructions.to_string()).map_err(|e| e.to_string())?;
 
     Ok(Some(file))
 }
 
-#[derive(Debug)]
-struct AssemblyFile(NamedTempFile);
-
-impl AssemblyFile {
-    fn new() -> Result<Self, String> {
-        match NamedTempFile::with_suffix(".s") {
-            Ok(file) => Ok(AssemblyFile(file)),
-            Err(err) => Err(format!("Failed to create intermediate file: {err}")),
-        }
-    }
-}
-
-impl AsRef<ffi::OsStr> for AssemblyFile {
-    fn as_ref(&self) -> &ffi::OsStr {
-        self.0.path().as_os_str()
-    }
-}
-
-impl AsRef<path::Path> for AssemblyFile {
-    fn as_ref(&self) -> &path::Path {
-        self.0.path()
-    }
-}
-
-#[derive(Debug)]
-struct IntermediateFile(NamedTempFile);
-
-impl IntermediateFile {
-    fn new() -> Result<Self, String> {
-        match NamedTempFile::with_suffix(".i") {
-            Ok(file) => Ok(IntermediateFile(file)),
-            Err(err) => Err(format!("Failed to create assembly file: {err}")),
-        }
-    }
-}
-
-impl AsRef<ffi::OsStr> for IntermediateFile {
-    fn as_ref(&self) -> &ffi::OsStr {
-        self.0.path().as_os_str()
-    }
-}
-
-impl AsRef<path::Path> for IntermediateFile {
-    fn as_ref(&self) -> &path::Path {
-        self.0.path()
-    }
-}
-
 /// Build the C source file into an executable, optionally stopping after a specified step.
 pub fn build(input: &path::Path, stop_after: Option<CompileStep>) -> Result<(), String> {
-    let inter: IntermediateFile = IntermediateFile::new()?;
+    let inter: IntermediateFile = IntermediateFile::new(IntermediateFileType::PREPROCESSED)?;
 
     let mut cmd = process::Command::new("gcc");
     let cmd = cmd.args(["-E", "-P"]).arg(input).arg("-o").arg(&inter);

@@ -1,6 +1,6 @@
 use ccr::CompileStep;
 use clap::{ArgGroup, Command, Id, arg};
-use std::{path::Path, process, str::FromStr};
+use std::{path, process};
 use tracing::{Level, error};
 use tracing_subscriber::FmtSubscriber;
 
@@ -18,6 +18,7 @@ fn build_cli() -> Command {
         arg!(--parse "Runs the parser and exits"),
         arg!(--tacky "Generates tacky assembly and exits"),
         arg!(--codegen "Runs assembly generation and exits"),
+        arg!(--validate "Runs semantic analysis and exists"),
     ];
 
     let stop_after = ArgGroup::new("stop_after")
@@ -38,11 +39,18 @@ fn main() {
     init_loggging(Level::DEBUG);
 
     let args = build_cli().get_matches();
+    let path = path::Path::new(args.get_one::<String>("path").unwrap());
 
-    let path = Path::new(args.get_one::<String>("path").unwrap());
     let stop_after = args
         .get_one::<Id>("stop_after")
-        .map(|id| CompileStep::from_str(id.as_str()).unwrap());
+        .map(|id| match id.as_str() {
+            "lex" => CompileStep::LEX,
+            "parse" => CompileStep::PARSE,
+            "tacky" => CompileStep::TACKY,
+            "codegen" => CompileStep::CODEGEN,
+            "validate" => CompileStep::VALIDATE,
+            arg => panic!("Unrecognized argument '{arg}'"),
+        });
 
     if path.exists() && path.is_file() {
         if let Err(e) = ccr::build(path, stop_after) {
