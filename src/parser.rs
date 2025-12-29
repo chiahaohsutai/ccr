@@ -1,8 +1,7 @@
 use core::fmt;
 use std::collections::VecDeque;
-use tracing::info;
 
-use super::tokenizer::{self, Token};
+use super::tokenizer;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
@@ -11,36 +10,36 @@ pub enum UnaryOperator {
     COMPLEMENT,
 }
 
-impl fmt::Display for UnaryOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            UnaryOperator::NOT => write!(f, "!"),
-            UnaryOperator::NEGATE => write!(f, "-"),
-            UnaryOperator::COMPLEMENT => write!(f, "~"),
-        }
-    }
-}
-
 impl TryFrom<tokenizer::Operator> for UnaryOperator {
     type Error = String;
 
     fn try_from(op: tokenizer::Operator) -> Result<Self, Self::Error> {
         match op {
-            tokenizer::Operator::NEGATION => Ok(UnaryOperator::NEGATE),
-            tokenizer::Operator::COMPLEMENT => Ok(UnaryOperator::COMPLEMENT),
-            tokenizer::Operator::NOT => Ok(UnaryOperator::NOT),
+            tokenizer::Operator::NEGATION => Ok(Self::NEGATE),
+            tokenizer::Operator::COMPLEMENT => Ok(Self::COMPLEMENT),
+            tokenizer::Operator::NOT => Ok(Self::NOT),
             _ => Err(format!("Operator '{op}' is not a unary operator.")),
         }
     }
 }
 
-impl TryFrom<Token> for UnaryOperator {
+impl TryFrom<tokenizer::Token> for UnaryOperator {
     type Error = String;
 
-    fn try_from(token: Token) -> Result<Self, Self::Error> {
+    fn try_from(token: tokenizer::Token) -> Result<Self, Self::Error> {
         match token {
-            Token::OPERATOR(op) => UnaryOperator::try_from(op),
+            tokenizer::Token::OPERATOR(op) => Self::try_from(op),
             _ => Err(String::from("Token is not an operator.")),
+        }
+    }
+}
+
+impl fmt::Display for UnaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NOT => write!(f, "!"),
+            Self::NEGATE => write!(f, "-"),
+            Self::COMPLEMENT => write!(f, "~"),
         }
     }
 }
@@ -68,68 +67,68 @@ pub enum BinaryOperator {
     ASSIGNMENT,
 }
 
-impl fmt::Display for BinaryOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            BinaryOperator::ADD => write!(f, "+"),
-            BinaryOperator::SUBTRACT => write!(f, "-"),
-            BinaryOperator::MULTIPLY => write!(f, "*"),
-            BinaryOperator::DIVIDE => write!(f, "/"),
-            BinaryOperator::REMAINDER => write!(f, "%"),
-            BinaryOperator::BITWISEAND => write!(f, "&"),
-            BinaryOperator::BITWISEOR => write!(f, "|"),
-            BinaryOperator::BITWISEXOR => write!(f, "^"),
-            BinaryOperator::LEFTSHIFT => write!(f, "<<"),
-            BinaryOperator::RIGHTSHIFT => write!(f, ">>"),
-            BinaryOperator::AND => write!(f, "&&"),
-            BinaryOperator::OR => write!(f, "||"),
-            BinaryOperator::EQUAL => write!(f, "=="),
-            BinaryOperator::NOTEQUAL => write!(f, "!="),
-            BinaryOperator::LESSTHAN => write!(f, "<"),
-            BinaryOperator::GREATERTHAN => write!(f, ">"),
-            BinaryOperator::LESSEQUAL => write!(f, "<="),
-            BinaryOperator::GREATEREQUAL => write!(f, ">="),
-            BinaryOperator::ASSIGNMENT => write!(f, "="),
-        }
-    }
-}
-
 impl TryFrom<tokenizer::Operator> for BinaryOperator {
     type Error = String;
 
     fn try_from(op: tokenizer::Operator) -> Result<Self, Self::Error> {
         match op {
-            tokenizer::Operator::ADDITION => Ok(BinaryOperator::ADD),
-            tokenizer::Operator::NEGATION => Ok(BinaryOperator::SUBTRACT),
-            tokenizer::Operator::PRODUCT => Ok(BinaryOperator::MULTIPLY),
-            tokenizer::Operator::DIVISION => Ok(BinaryOperator::DIVIDE),
-            tokenizer::Operator::REMAINDER => Ok(BinaryOperator::REMAINDER),
-            tokenizer::Operator::BITWISEAND => Ok(BinaryOperator::BITWISEAND),
-            tokenizer::Operator::BITWISEOR => Ok(BinaryOperator::BITWISEOR),
-            tokenizer::Operator::BITWISEXOR => Ok(BinaryOperator::BITWISEXOR),
-            tokenizer::Operator::LEFTSHIFT => Ok(BinaryOperator::LEFTSHIFT),
-            tokenizer::Operator::RIGHTSHIFT => Ok(BinaryOperator::RIGHTSHIFT),
-            tokenizer::Operator::AND => Ok(BinaryOperator::AND),
-            tokenizer::Operator::OR => Ok(BinaryOperator::OR),
-            tokenizer::Operator::EQUAL => Ok(BinaryOperator::EQUAL),
-            tokenizer::Operator::NOTEQUAL => Ok(BinaryOperator::NOTEQUAL),
-            tokenizer::Operator::LESSTHAN => Ok(BinaryOperator::LESSTHAN),
-            tokenizer::Operator::GREATERTHAN => Ok(BinaryOperator::GREATERTHAN),
-            tokenizer::Operator::LESSEQUAL => Ok(BinaryOperator::LESSEQUAL),
-            tokenizer::Operator::GREATEREQUAL => Ok(BinaryOperator::GREATEREQUAL),
-            tokenizer::Operator::ASSIGNMENT => Ok(BinaryOperator::ASSIGNMENT),
+            tokenizer::Operator::ADDITION => Ok(Self::ADD),
+            tokenizer::Operator::NEGATION => Ok(Self::SUBTRACT),
+            tokenizer::Operator::PRODUCT => Ok(Self::MULTIPLY),
+            tokenizer::Operator::DIVISION => Ok(Self::DIVIDE),
+            tokenizer::Operator::REMAINDER => Ok(Self::REMAINDER),
+            tokenizer::Operator::BITWISEAND => Ok(Self::BITWISEAND),
+            tokenizer::Operator::BITWISEOR => Ok(Self::BITWISEOR),
+            tokenizer::Operator::BITWISEXOR => Ok(Self::BITWISEXOR),
+            tokenizer::Operator::LEFTSHIFT => Ok(Self::LEFTSHIFT),
+            tokenizer::Operator::RIGHTSHIFT => Ok(Self::RIGHTSHIFT),
+            tokenizer::Operator::AND => Ok(Self::AND),
+            tokenizer::Operator::OR => Ok(Self::OR),
+            tokenizer::Operator::EQUAL => Ok(Self::EQUAL),
+            tokenizer::Operator::NOTEQUAL => Ok(Self::NOTEQUAL),
+            tokenizer::Operator::LESSTHAN => Ok(Self::LESSTHAN),
+            tokenizer::Operator::GREATERTHAN => Ok(Self::GREATERTHAN),
+            tokenizer::Operator::LESSEQUAL => Ok(Self::LESSEQUAL),
+            tokenizer::Operator::GREATEREQUAL => Ok(Self::GREATEREQUAL),
+            tokenizer::Operator::ASSIGNMENT => Ok(Self::ASSIGNMENT),
             _ => Err(format!("Operator '{op}' is not a binary operator.")),
         }
     }
 }
 
-impl TryFrom<Token> for BinaryOperator {
+impl TryFrom<tokenizer::Token> for BinaryOperator {
     type Error = String;
 
-    fn try_from(token: Token) -> Result<Self, Self::Error> {
+    fn try_from(token: tokenizer::Token) -> Result<Self, Self::Error> {
         match token {
-            Token::OPERATOR(op) => BinaryOperator::try_from(op),
+            tokenizer::Token::OPERATOR(op) => Self::try_from(op),
             _ => Err(String::from("Token is not an operator.")),
+        }
+    }
+}
+
+impl fmt::Display for BinaryOperator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ADD => write!(f, "+"),
+            Self::SUBTRACT => write!(f, "-"),
+            Self::MULTIPLY => write!(f, "*"),
+            Self::DIVIDE => write!(f, "/"),
+            Self::REMAINDER => write!(f, "%"),
+            Self::BITWISEAND => write!(f, "&"),
+            Self::BITWISEOR => write!(f, "|"),
+            Self::BITWISEXOR => write!(f, "^"),
+            Self::LEFTSHIFT => write!(f, "<<"),
+            Self::RIGHTSHIFT => write!(f, ">>"),
+            Self::AND => write!(f, "&&"),
+            Self::OR => write!(f, "||"),
+            Self::EQUAL => write!(f, "=="),
+            Self::NOTEQUAL => write!(f, "!="),
+            Self::LESSTHAN => write!(f, "<"),
+            Self::GREATERTHAN => write!(f, ">"),
+            Self::LESSEQUAL => write!(f, "<="),
+            Self::GREATEREQUAL => write!(f, ">="),
+            Self::ASSIGNMENT => write!(f, "="),
         }
     }
 }
@@ -142,13 +141,38 @@ pub enum Factor {
     EXPRESSION(Box<Expression>),
 }
 
+impl Factor {
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::IDENTIFIER(name)) => Ok(Self::IDENTIFIER(name)),
+            Some(tokenizer::Token::CONSTANT(value)) => Ok(Self::INT(value)),
+            Some(tokenizer::Token::OPERATOR(op)) => {
+                let factor = Box::new(Self::parse(tokens)?);
+                UnaryOperator::try_from(op)
+                    .map_err(|_| format!("Unexpected unary operator '{}' in factor.", op))
+                    .map(|op| Self::UNARY(op, factor))
+            }
+            Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::LPAREN)) => {
+                let expr = Expression::parse(tokens, 0)?;
+                let next = tokens.pop_front();
+                if let Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::RPAREN)) = next {
+                    Ok(Self::EXPRESSION(Box::new(expr)))
+                } else {
+                    Err(String::from("Expected ')' after expression."))
+                }
+            }
+            tkn => Err(format!("Malformed factor, found {tkn:?}.")),
+        }
+    }
+}
+
 impl fmt::Display for Factor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Factor::INT(n) => write!(f, "{n}"),
-            Factor::UNARY(op, fac) => write!(f, "{op}{fac}"),
-            Factor::EXPRESSION(e) => write!(f, "({e})"),
-            Factor::IDENTIFIER(i) => write!(f, "{i}"),
+            Self::INT(n) => write!(f, "{n}"),
+            Self::UNARY(op, fac) => write!(f, "{op}{fac}"),
+            Self::EXPRESSION(e) => write!(f, "({e})"),
+            Self::IDENTIFIER(i) => write!(f, "{i}"),
         }
     }
 }
@@ -159,17 +183,47 @@ pub enum Expression {
     BINARY(Box<Expression>, BinaryOperator, Box<Expression>),
 }
 
+impl Expression {
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>, precedence: u64) -> Result<Self, String> {
+        let mut lhs = Expression::FACTOR(Factor::parse(tokens)?);
+
+        while tokens
+            .front()
+            .is_some_and(|t| t.is_binary_operator() && t.precedence() >= precedence)
+        {
+            let token = tokens.pop_front().unwrap();
+            let precedence = token.precedence();
+
+            if let tokenizer::Token::OPERATOR(tokenizer::Operator::ASSIGNMENT) = token {
+                let rhs = Expression::parse(tokens, precedence)?;
+                lhs = Self::BINARY(Box::new(lhs), BinaryOperator::ASSIGNMENT, Box::new(rhs));
+            } else {
+                let rhs = Expression::parse(tokens, precedence + 1)?;
+                let op = BinaryOperator::try_from(token).unwrap();
+                lhs = Expression::BINARY(Box::new(lhs), op, Box::new(rhs));
+            }
+        }
+        Ok(lhs)
+    }
+}
+
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Expression::FACTOR(fac) => write!(f, "{fac}"),
-            Expression::BINARY(l, op, r) => write!(f, "{l} {op} {r}"),
+            Self::FACTOR(fac) => write!(f, "{fac}"),
+            Self::BINARY(l, op, r) => write!(f, "{l} {op} {r}"),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Declaration(String, Option<Expression>);
+
+impl Declaration {
+    fn parse(tokens: VecDeque<tokenizer::Token>) {
+        todo!()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -178,12 +232,18 @@ pub enum Statement {
     EXPRESSION(Expression),
 }
 
+impl Statement {
+    fn parse(tokens: VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        todo!()
+    }
+}
+
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Statement::NULL => write!(f, ";"),
-            Statement::EXPRESSION(expr) => write!(f, "{};", expr),
-            Statement::RETURN(expr) => write!(f, "RETURN {};", expr),
+            Self::NULL => write!(f, ";"),
+            Self::EXPRESSION(expr) => write!(f, "{};", expr),
+            Self::RETURN(expr) => write!(f, "RETURN {};", expr),
         }
     }
 }
@@ -195,11 +255,64 @@ pub enum BlockItem {
     Statement(Statement),
 }
 
+impl BlockItem {
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
+                Ok(Self::Statement(Statement::NULL))
+            }
+            Some(tokenizer::Token::KEYWORD(tokenizer::Keyword::INT)) => {
+                let name = match tokens.pop_front() {
+                    Some(tokenizer::Token::IDENTIFIER(id)) => Ok(id),
+                    None => Err(String::from("Unexpected end of input.")),
+                    _ => Err(String::from("Expected identifier after 'int'.")),
+                }?;
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
+                        Ok(Self::Declaration(Declaration(name, None)))
+                    }
+                    Some(tokenizer::Token::OPERATOR(tokenizer::Operator::ASSIGNMENT)) => {
+                        let expr = Expression::parse(tokens, 0)?;
+                        match tokens.pop_front() {
+                            Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
+                                Ok(Self::Declaration(Declaration(name, Some(expr))))
+                            }
+                            _ => Err(String::from("Expected ';' after declaration.")),
+                        }
+                    }
+                    _ => Err(String::from("Expected ';' or '=' after variable name.")),
+                }
+            }
+            Some(tokenizer::Token::KEYWORD(tokenizer::Keyword::RETURN)) => {
+                let expr = Expression::parse(tokens, 0)?;
+                let stmt = match tokens.pop_front() {
+                    Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
+                        Ok(Statement::RETURN(expr))
+                    }
+                    _ => Err(String::from("Expected ';' after return expression.")),
+                };
+                stmt.map(BlockItem::Statement)
+            }
+            Some(token) => {
+                tokens.push_front(token);
+                let expr = Expression::parse(tokens, 0)?;
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
+                        Ok(BlockItem::Statement(Statement::EXPRESSION(expr)))
+                    }
+                    _ => Err(String::from("Expected ';' after expression statement.")),
+                }
+            }
+            None => Err(String::from("Unexpected end of input while parsing body.")),
+        }
+    }
+}
+
 impl fmt::Display for BlockItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BlockItem::Declaration(decl) => write!(f, "{}", decl.0),
-            BlockItem::Statement(stmt) => write!(f, "{}", stmt),
+            Self::Declaration(decl) => write!(f, "{}", decl.0),
+            Self::Statement(stmt) => write!(f, "{}", stmt),
         }
     }
 }
@@ -211,6 +324,44 @@ pub struct Function(String, Vec<BlockItem>);
 impl Function {
     pub fn name(&self) -> &str {
         &self.0
+    }
+
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::KEYWORD(tokenizer::Keyword::INT)) => {
+                let name = match tokens.pop_front() {
+                    Some(tokenizer::Token::IDENTIFIER(name)) => Ok(name),
+                    None => Err(String::from("Unexpected end of input.")),
+                    _ => Err(String::from("Expected identifier.")),
+                }?;
+                match (tokens.pop_front(), tokens.pop_front(), tokens.pop_front()) {
+                    (
+                        Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::LPAREN)),
+                        Some(tokenizer::Token::KEYWORD(tokenizer::Keyword::VOID)),
+                        Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::RPAREN)),
+                    ) => match tokens.pop_front() {
+                        Some(tokenizer::Token::DELIMITER(tokenizer::Delimiter::LBRACE)) => {
+                            let mut block: Vec<BlockItem> = Vec::new();
+                            loop {
+                                if let Some(tokenizer::Token::DELIMITER(
+                                    tokenizer::Delimiter::RBRACE,
+                                )) = tokens.front()
+                                {
+                                    tokens.pop_front();
+                                    break Ok(Function(name, block));
+                                }
+                                let item = BlockItem::parse(tokens)?;
+                                block.push(item);
+                            }
+                        }
+                        _ => Err(String::from("Expected '{' at the start of fn body.")),
+                    },
+                    _ => Err(String::from("Expected '(void)' after fn name.")),
+                }
+            }
+            None => Err(String::from("Unexpected end of input while parsing fn.")),
+            _ => Err(String::from("Expected 'int' keyword at the start of a fn.")),
+        }
     }
 }
 
@@ -231,7 +382,6 @@ impl From<Program> for Function {
     }
 }
 
-/// Represents a complete program in the AST.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program(Function);
 
@@ -241,163 +391,11 @@ impl fmt::Display for Program {
     }
 }
 
-fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Factor, String> {
-    match tokens.pop_front() {
-        Some(Token::IDENTIFIER(name)) => Ok(Factor::IDENTIFIER(name)),
-        Some(Token::CONSTANT(value)) => Ok(Factor::INT(value)),
-        Some(Token::OPERATOR(op)) => match op {
-            tokenizer::Operator::NEGATION => {
-                let factor = parse_factor(tokens)?;
-                Ok(Factor::UNARY(UnaryOperator::NEGATE, Box::new(factor)))
-            }
-            tokenizer::Operator::COMPLEMENT => {
-                let factor = parse_factor(tokens)?;
-                Ok(Factor::UNARY(UnaryOperator::COMPLEMENT, Box::new(factor)))
-            }
-            tokenizer::Operator::NOT => {
-                let factor = parse_factor(tokens)?;
-                Ok(Factor::UNARY(UnaryOperator::NOT, Box::new(factor)))
-            }
-            _ => Err(format!("Unexpected operator '{}' in factor.", op)),
-        },
-        Some(Token::DELIMITER(tokenizer::Delimiter::LPAREN)) => {
-            let expr = parse_expression(tokens, 0)?;
-            if let Some(Token::DELIMITER(tokenizer::Delimiter::RPAREN)) = tokens.pop_front() {
-                Ok(Factor::EXPRESSION(Box::new(expr)))
-            } else {
-                Err(String::from("Expected ')' after expression."))
-            }
-        }
-        tkn => Err(format!("Malformed factor, found {tkn:?}.")),
-    }
-}
+pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
+    let mut tokens: VecDeque<tokenizer::Token> = VecDeque::from(tokens);
 
-/// Parses expression production rule with precedence climbing.
-fn parse_expression(tokens: &mut VecDeque<Token>, precedence: u64) -> Result<Expression, String> {
-    let mut left = Expression::FACTOR(parse_factor(tokens)?);
-    let mut next = tokens.pop_front();
-
-    while next
-        .as_ref()
-        .is_some_and(|t| t.is_binary_operator() && t.precedence() >= precedence)
-    {
-        let token = next.unwrap();
-        let curr_precedence = token.precedence();
-
-        if let Token::OPERATOR(tokenizer::Operator::ASSIGNMENT) = token {
-            let right = parse_expression(tokens, curr_precedence)?;
-            left = Expression::BINARY(Box::new(left), BinaryOperator::ASSIGNMENT, Box::new(right));
-        } else {
-            let right = parse_expression(tokens, curr_precedence + 1)?;
-            left = Expression::BINARY(
-                Box::new(left),
-                BinaryOperator::try_from(token).unwrap(),
-                Box::new(right),
-            );
-        }
-        next = tokens.pop_front();
-    }
-    if let Some(t) = next {
-        tokens.push_front(t);
-    }
-    Ok(left)
-}
-
-/// Parses block item production rule.
-fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem, String> {
-    match tokens.pop_front() {
-        Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
-            Ok(BlockItem::Statement(Statement::NULL))
-        }
-        Some(Token::KEYWORD(tokenizer::Keyword::INT)) => {
-            let name = match tokens.pop_front() {
-                Some(Token::IDENTIFIER(id)) => Ok(id),
-                None => Err(String::from("Unexpected end of input.")),
-                _ => Err(String::from("Expected identifier after 'int'.")),
-            }?;
-            match tokens.pop_front() {
-                Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
-                    Ok(BlockItem::Declaration(Declaration(name, None)))
-                }
-                Some(Token::OPERATOR(tokenizer::Operator::ASSIGNMENT)) => {
-                    let expr = parse_expression(tokens, 0)?;
-                    match tokens.pop_front() {
-                        Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
-                            Ok(BlockItem::Declaration(Declaration(name, Some(expr))))
-                        }
-                        _ => Err(String::from("Expected ';' after declaration.")),
-                    }
-                }
-                _ => Err(String::from("Expected ';' or '=' after variable name.")),
-            }
-        }
-        Some(Token::KEYWORD(tokenizer::Keyword::RETURN)) => {
-            let expr = parse_expression(tokens, 0)?;
-            let stmt = match tokens.pop_front() {
-                Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
-                    Ok(Statement::RETURN(expr))
-                }
-                _ => Err(String::from("Expected ';' after return expression.")),
-            };
-            stmt.map(BlockItem::Statement)
-        }
-        Some(token) => {
-            tokens.push_front(token);
-            let expr = parse_expression(tokens, 0)?;
-            match tokens.pop_front() {
-                Some(Token::DELIMITER(tokenizer::Delimiter::SEMICOLON)) => {
-                    Ok(BlockItem::Statement(Statement::EXPRESSION(expr)))
-                }
-                _ => Err(String::from("Expected ';' after expression statement.")),
-            }
-        }
-        None => Err(String::from("Unexpected end of input while parsing body.")),
-    }
-}
-
-/// Parses function production rule.
-fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function, String> {
-    match tokens.pop_front() {
-        Some(Token::KEYWORD(tokenizer::Keyword::INT)) => {
-            let name = match tokens.pop_front() {
-                Some(Token::IDENTIFIER(name)) => Ok(name),
-                None => Err(String::from("Unexpected end of input.")),
-                _ => Err(String::from("Expected identifier.")),
-            }?;
-            match (tokens.pop_front(), tokens.pop_front(), tokens.pop_front()) {
-                (
-                    Some(Token::DELIMITER(tokenizer::Delimiter::LPAREN)),
-                    Some(Token::KEYWORD(tokenizer::Keyword::VOID)),
-                    Some(Token::DELIMITER(tokenizer::Delimiter::RPAREN)),
-                ) => match tokens.pop_front() {
-                    Some(Token::DELIMITER(tokenizer::Delimiter::LBRACE)) => {
-                        let mut block: Vec<BlockItem> = Vec::new();
-                        loop {
-                            let next = tokens.front();
-                            if let Some(Token::DELIMITER(tokenizer::Delimiter::RBRACE)) = next {
-                                tokens.pop_front();
-                                break Ok(Function(name, block));
-                            }
-                            let item = parse_block_item(tokens)?;
-                            block.push(item);
-                        }
-                    }
-                    _ => Err(String::from("Expected '{' at the start of fn body.")),
-                },
-                _ => Err(String::from("Expected '(void)' after fn name.")),
-            }
-        }
-        None => Err(String::from("Unexpected end of input while parsing fn.")),
-        _ => Err(String::from("Expected 'int' keyword at the start of a fn.")),
-    }
-}
-
-/// Parses program production rule.
-pub fn parse(tokens: Vec<Token>) -> Result<Program, String> {
-    info!("Generating AST...");
-
-    let mut tokens: VecDeque<Token> = VecDeque::from(tokens);
-    let program = Program(parse_function(&mut tokens)?);
+    let main = Function::parse(&mut tokens)?;
+    let program = Program(main);
 
     if tokens.is_empty() {
         Ok(program)

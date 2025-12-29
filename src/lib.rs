@@ -97,7 +97,6 @@ fn compile<T: AsRef<path::Path>>(
     Ok(Some(file))
 }
 
-/// Build the C source file into an executable, optionally stopping after a specified step.
 pub fn build(input: &path::Path, stop_after: Option<CompileStep>) -> Result<(), String> {
     let inter: IntermediateFile = IntermediateFile::new(IntermediateFileType::PREPROCESSED)?;
 
@@ -110,19 +109,18 @@ pub fn build(input: &path::Path, stop_after: Option<CompileStep>) -> Result<(), 
         Err(e) => Err(format!("Failed to execute preprocessing command: {e}")),
     };
 
-    match compile(inter?, stop_after)? {
-        Some(file) => {
-            let out = input.parent().unwrap().join(input.file_name().unwrap());
+    if let Some(file) = compile(inter?, stop_after)? {
+        let out = input.parent().unwrap().join(input.file_name().unwrap());
 
-            let mut cmd = process::Command::new("gcc");
-            let cmd = cmd.arg(file).arg("-o").arg(out);
+        let mut cmd = process::Command::new("gcc");
+        let cmd = cmd.arg(file).arg("-o").arg(out);
 
-            match cmd.status() {
-                Ok(status) if status.success() => Ok(()),
-                Ok(status) => Err(format!("Linking failed with exit status: {status}")),
-                Err(err) => Err(format!("Linking command failed: {err}")),
-            }
+        match cmd.status() {
+            Ok(status) if status.success() => Ok(()),
+            Ok(status) => Err(format!("Linking failed with exit status: {status}")),
+            Err(err) => Err(format!("Linking command failed: {err}")),
         }
-        None => Ok(()),
+    } else {
+        Ok(())
     }
 }
