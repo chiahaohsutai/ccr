@@ -28,6 +28,12 @@ cargo run -- --lex path/to/my_program.c
 # Run the compiler and stop after the parsing stage (AST generation)
 cargo run -- --parse path/to/my_program.c
 
+# Run the compiler and stop after the validation stage (AST semantic validation)
+cargo run -- --validate path/to/my_program.c
+
+# Run the compiler and stop after the tacky stage (TAC generation)
+cargo run -- --tacky path/to/my_program.c
+
 # Run the compiler and stop after code generation (emit assembly)
 cargo run -- --codegen path/to/my_program.c
 ```
