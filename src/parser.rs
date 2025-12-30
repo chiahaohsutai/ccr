@@ -268,11 +268,20 @@ impl fmt::Display for Expression {
 pub struct Declaration(String, Option<Expression>);
 
 impl Declaration {
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+
+    pub fn initializer(self) -> Option<Expression> {
+        self.1
+    }
+
     fn resolve(declaration: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         if variables.contains_key(&declaration.0) {
             Err(String::from("Duplicate variable declaration"))
         } else {
-            let name = nanoid!(21, ALPHANUMERIC);
+            let id = nanoid!(21, ALPHANUMERIC);
+            let name = format!("var.{}.{id}", &declaration.0);
             variables.insert(String::from(&declaration.0), String::from(&name));
             if let Some(expr) = declaration.1 {
                 let initializer = Expression::resolve(expr, variables)?;
@@ -397,6 +406,10 @@ pub struct Function(String, Vec<BlockItem>);
 impl Function {
     pub fn name(&self) -> &str {
         &self.0
+    }
+
+    pub fn instructions(self) -> Vec<BlockItem> {
+        self.1
     }
 
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {

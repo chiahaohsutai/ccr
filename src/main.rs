@@ -4,7 +4,7 @@ use tracing_subscriber::FmtSubscriber;
 
 use std::{path, process};
 
-use ccr::CompileStep;
+use nora::{CompileStep, build};
 
 fn init_loggging(level: Level) {
     let subscriber = FmtSubscriber::builder().with_max_level(level).finish();
@@ -55,7 +55,7 @@ fn main() {
         });
 
     if path.exists() && path.is_file() {
-        if let Err(e) = ccr::build(path, stop_after) {
+        if let Err(e) = build(path, stop_after) {
             error!("Compilation failed: {}", e);
             eprintln!("Compilation failed: {}", e);
             process::exit(1);

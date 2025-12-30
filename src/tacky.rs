@@ -12,22 +12,22 @@ pub enum UnaryOperator {
     NOT,
 }
 
+impl From<parser::UnaryOperator> for UnaryOperator {
+    fn from(op: parser::UnaryOperator) -> Self {
+        match op {
+            parser::UnaryOperator::COMPLEMENT => Self::COMPLEMENT,
+            parser::UnaryOperator::NEGATE => Self::NEGATE,
+            parser::UnaryOperator::NOT => Self::NOT,
+        }
+    }
+}
+
 impl fmt::Display for UnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UnaryOperator::COMPLEMENT => write!(f, "~"),
             UnaryOperator::NEGATE => write!(f, "-"),
             UnaryOperator::NOT => write!(f, "!"),
-        }
-    }
-}
-
-impl From<parser::UnaryOperator> for UnaryOperator {
-    fn from(op: parser::UnaryOperator) -> Self {
-        match op {
-            parser::UnaryOperator::COMPLEMENT => UnaryOperator::COMPLEMENT,
-            parser::UnaryOperator::NEGATE => UnaryOperator::NEGATE,
-            parser::UnaryOperator::NOT => UnaryOperator::NOT,
         }
     }
 }
@@ -50,6 +50,32 @@ pub enum BinaryOperator {
     GREATERTHAN,
     LESSEQUAL,
     GREATEREQUAL,
+}
+
+impl TryFrom<parser::BinaryOperator> for BinaryOperator {
+    type Error = String;
+
+    fn try_from(op: parser::BinaryOperator) -> Result<Self, String> {
+        match op {
+            parser::BinaryOperator::ADD => Ok(Self::ADD),
+            parser::BinaryOperator::SUBTRACT => Ok(Self::SUBTRACT),
+            parser::BinaryOperator::MULTIPLY => Ok(Self::MULTIPLY),
+            parser::BinaryOperator::DIVIDE => Ok(Self::DIVIDE),
+            parser::BinaryOperator::REMAINDER => Ok(Self::REMAINDER),
+            parser::BinaryOperator::BITWISEAND => Ok(Self::BITWISEAND),
+            parser::BinaryOperator::BITWISEOR => Ok(Self::BITWISEOR),
+            parser::BinaryOperator::BITWISEXOR => Ok(Self::BITWISEXOR),
+            parser::BinaryOperator::LEFTSHIFT => Ok(Self::LEFTSHIFT),
+            parser::BinaryOperator::RIGHTSHIFT => Ok(Self::RIGHTSHIFT),
+            parser::BinaryOperator::EQUAL => Ok(Self::EQUAL),
+            parser::BinaryOperator::NOTEQUAL => Ok(Self::NOTEQUAL),
+            parser::BinaryOperator::LESSTHAN => Ok(Self::LESSTHAN),
+            parser::BinaryOperator::GREATERTHAN => Ok(Self::GREATERTHAN),
+            parser::BinaryOperator::LESSEQUAL => Ok(Self::LESSEQUAL),
+            parser::BinaryOperator::GREATEREQUAL => Ok(Self::GREATEREQUAL),
+            _ => Err(format!("Operator '{:?}' is not a tacky binary op.", op)),
+        }
+    }
 }
 
 impl fmt::Display for BinaryOperator {
@@ -75,36 +101,24 @@ impl fmt::Display for BinaryOperator {
     }
 }
 
-impl TryFrom<parser::BinaryOperator> for BinaryOperator {
-    type Error = String;
-
-    fn try_from(op: parser::BinaryOperator) -> Result<Self, String> {
-        match op {
-            parser::BinaryOperator::ADD => Ok(BinaryOperator::ADD),
-            parser::BinaryOperator::SUBTRACT => Ok(BinaryOperator::SUBTRACT),
-            parser::BinaryOperator::MULTIPLY => Ok(BinaryOperator::MULTIPLY),
-            parser::BinaryOperator::DIVIDE => Ok(BinaryOperator::DIVIDE),
-            parser::BinaryOperator::REMAINDER => Ok(BinaryOperator::REMAINDER),
-            parser::BinaryOperator::BITWISEAND => Ok(BinaryOperator::BITWISEAND),
-            parser::BinaryOperator::BITWISEOR => Ok(BinaryOperator::BITWISEOR),
-            parser::BinaryOperator::BITWISEXOR => Ok(BinaryOperator::BITWISEXOR),
-            parser::BinaryOperator::LEFTSHIFT => Ok(BinaryOperator::LEFTSHIFT),
-            parser::BinaryOperator::RIGHTSHIFT => Ok(BinaryOperator::RIGHTSHIFT),
-            parser::BinaryOperator::EQUAL => Ok(BinaryOperator::EQUAL),
-            parser::BinaryOperator::NOTEQUAL => Ok(BinaryOperator::NOTEQUAL),
-            parser::BinaryOperator::LESSTHAN => Ok(BinaryOperator::LESSTHAN),
-            parser::BinaryOperator::GREATERTHAN => Ok(BinaryOperator::GREATERTHAN),
-            parser::BinaryOperator::LESSEQUAL => Ok(BinaryOperator::LESSEQUAL),
-            parser::BinaryOperator::GREATEREQUAL => Ok(BinaryOperator::GREATEREQUAL),
-            _ => Err(format!("Operator '{:?}' is not a tacky binary op.", op)),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operand {
     CONSTANT(u64),
     VARIABLE(String),
+}
+
+impl TryFrom<parser::Expression> for Operand {
+    type Error = String;
+
+    fn try_from(value: parser::Expression) -> Result<Self, String> {
+        match value {
+            parser::Expression::FACTOR(parser::Factor::IDENTIFIER(ident)) => {
+                Ok(Self::VARIABLE(ident))
+            }
+            parser::Expression::FACTOR(parser::Factor::INT(i)) => Ok(Self::CONSTANT(i)),
+            _ => Err(String::from("Expression is not an operand")),
+        }
+    }
 }
 
 impl fmt::Display for Operand {
@@ -145,29 +159,35 @@ impl fmt::Display for Instruction {
 fn generate_instructions(
     expression: parser::Expression,
     instructions: &mut Vec<Instruction>,
-) -> Operand {
+) -> Result<Operand, String> {
     match expression {
         parser::Expression::FACTOR(factor) => match factor {
-            parser::Factor::INT(n) => Operand::CONSTANT(n),
+            parser::Factor::INT(n) => Ok(Operand::CONSTANT(n)),
             parser::Factor::UNARY(op, exp) => {
-                let src = generate_instructions(parser::Expression::FACTOR(*exp), instructions);
+                let src = generate_instructions(parser::Expression::FACTOR(*exp), instructions)?;
                 let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
                 let op = UnaryOperator::from(op);
                 instructions.push(Instruction::UNARY(op, src, dst.clone()));
-                dst
+                Ok(dst)
             }
             parser::Factor::EXPRESSION(expr) => generate_instructions(*expr, instructions),
-            _ => todo!(),
+            parser::Factor::IDENTIFIER(ident) => Ok(Operand::VARIABLE(ident)),
         },
+        parser::Expression::BINARY(lhs, parser::BinaryOperator::ASSIGNMENT, rhs) => {
+            let rhs = generate_instructions(*rhs, instructions)?;
+            let lhs = Operand::try_from(*lhs)?;
+            instructions.push(Instruction::COPY(rhs, lhs.clone()));
+            Ok(lhs)
+        }
         parser::Expression::BINARY(lhs, op, rhs) => {
             let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
 
             if let parser::BinaryOperator::AND | parser::BinaryOperator::OR = op {
                 let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
-                let lhs = generate_instructions(*lhs, instructions);
+                let lhs = generate_instructions(*lhs, instructions)?;
 
                 let mut rhs_instructions: Vec<Instruction> = Vec::new();
-                let rhs = generate_instructions(*rhs, &mut rhs_instructions);
+                let rhs = generate_instructions(*rhs, &mut rhs_instructions)?;
 
                 if matches!(op, parser::BinaryOperator::AND) {
                     let isfalse = format!("label.{}", nanoid!(21, ALPHANUMERIC));
@@ -190,16 +210,15 @@ fn generate_instructions(
                     instructions.push(Instruction::COPY(Operand::CONSTANT(1), dst.clone()));
                     instructions.push(Instruction::LABEL(end));
                 }
-                dst
+                Ok(dst)
             } else {
-                let lhs = generate_instructions(*lhs, instructions);
-                let rhs = generate_instructions(*rhs, instructions);
+                let lhs = generate_instructions(*lhs, instructions)?;
+                let rhs = generate_instructions(*rhs, instructions)?;
                 let op = BinaryOperator::try_from(op).unwrap();
                 instructions.push(Instruction::BINARY(op, lhs, rhs, dst.clone()));
-                dst
+                Ok(dst)
             }
         }
-        _ => todo!(),
     }
 }
 
@@ -229,20 +248,39 @@ impl From<Function> for Vec<Instruction> {
     }
 }
 
-impl From<parser::Function> for Function {
-    fn from(function: parser::Function) -> Self {
-        todo!()
-        // let name = String::from(function.name().as_ref());
-        // let mut instructions: Vec<Instruction> = Vec::new();
+impl TryFrom<parser::Function> for Function {
+    type Error = String;
 
-        // match parser::Statement::from(function) {
-        //     parser::Statement::RETURN(expr) => {
-        //         debug!("Generating instructions for return expression: {}", expr);
-        //         let value = generate_instructions(expr, &mut instructions);
-        //         instructions.push(Instruction::RETURN(value));
-        //     }
-        // };
-        // Function(name, instructions)
+    fn try_from(function: parser::Function) -> Result<Self, String> {
+        let name = String::from(function.name());
+        let mut instructions: Vec<Instruction> = Vec::new();
+        for item in function.instructions() {
+            match item {
+                parser::BlockItem::Declaration(decl) => {
+                    let name = String::from(decl.name());
+                    if let Some(expr) = decl.initializer() {
+                        let opr = generate_instructions(expr, &mut instructions)?;
+                        let dst = Operand::VARIABLE(name);
+                        instructions.push(Instruction::COPY(opr, dst));
+                    }
+                }
+                parser::BlockItem::Statement(stmt) => match stmt {
+                    parser::Statement::EXPRESSION(expr) => {
+                        let _ = generate_instructions(expr, &mut instructions)?;
+                    }
+                    parser::Statement::RETURN(expr) => {
+                        let res = generate_instructions(expr, &mut instructions)?;
+                        instructions.push(Instruction::RETURN(res));
+                    }
+                    parser::Statement::NULL => (),
+                },
+            };
+        }
+        match instructions.last() {
+            Some(Instruction::RETURN(_)) => (),
+            _ => instructions.push(Instruction::RETURN(Operand::CONSTANT(0))),
+        };
+        Ok(Function(name, instructions))
     }
 }
 
@@ -260,9 +298,11 @@ impl fmt::Display for Program {
     }
 }
 
-impl From<parser::Program> for Program {
-    fn from(program: parser::Program) -> Self {
+impl TryFrom<parser::Program> for Program {
+    type Error = String;
+
+    fn try_from(program: parser::Program) -> Result<Self, String> {
         let function = parser::Function::from(program);
-        Program(Function::from(function))
+        Ok(Program(Function::try_from(function)?))
     }
 }

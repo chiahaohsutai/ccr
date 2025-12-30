@@ -1,60 +1,11 @@
-use tempfile::NamedTempFile;
+use tempfile::{Builder, NamedTempFile};
 
-use std::{ffi, fs, path, process};
+use std::{fs, path, process};
 
 pub mod codegen;
 pub mod parser;
 pub mod tacky;
 pub mod tokenizer;
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-enum IntermediateFileType {
-    PREPROCESSED,
-    ASSEMBLY,
-}
-
-impl AsRef<str> for IntermediateFileType {
-    fn as_ref(&self) -> &str {
-        match self {
-            Self::PREPROCESSED => ".i",
-            Self::ASSEMBLY => ".s",
-        }
-    }
-}
-
-impl AsRef<ffi::OsStr> for IntermediateFileType {
-    fn as_ref(&self) -> &ffi::OsStr {
-        let suffix: &str = self.as_ref();
-        match self {
-            Self::PREPROCESSED => ffi::OsStr::new(suffix),
-            Self::ASSEMBLY => ffi::OsStr::new(suffix),
-        }
-    }
-}
-
-#[derive(Debug)]
-struct IntermediateFile(NamedTempFile<fs::File>);
-
-impl IntermediateFile {
-    fn new(filetype: IntermediateFileType) -> Result<Self, String> {
-        match NamedTempFile::with_suffix(&filetype) {
-            Ok(file) => Ok(IntermediateFile(file)),
-            Err(err) => Err(format!("Failed to create intermediate file: {err}")),
-        }
-    }
-}
-
-impl AsRef<ffi::OsStr> for IntermediateFile {
-    fn as_ref(&self) -> &ffi::OsStr {
-        self.0.path().as_os_str()
-    }
-}
-
-impl AsRef<path::Path> for IntermediateFile {
-    fn as_ref(&self) -> &path::Path {
-        self.0.path()
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum CompileStep {
@@ -68,7 +19,7 @@ pub enum CompileStep {
 fn compile<T: AsRef<path::Path>>(
     input: T,
     stop_after: Option<CompileStep>,
-) -> Result<Option<IntermediateFile>, String> {
+) -> Result<Option<String>, String> {
     let content = fs::read_to_string(input).map_err(|e| e.to_string())?;
 
     let tokens = tokenizer::tokenize(&content)?;
@@ -83,7 +34,7 @@ fn compile<T: AsRef<path::Path>>(
     if matches!(stop_after, Some(CompileStep::VALIDATE)) {
         return Ok(None);
     }
-    let tac = tacky::Program::from(ast);
+    let tac = tacky::Program::try_from(ast)?;
     if matches!(stop_after, Some(CompileStep::TACKY)) {
         return Ok(None);
     }
@@ -91,29 +42,39 @@ fn compile<T: AsRef<path::Path>>(
     if matches!(stop_after, Some(CompileStep::CODEGEN)) {
         return Ok(None);
     };
-
-    let file: IntermediateFile = IntermediateFile::new(IntermediateFileType::ASSEMBLY)?;
-    fs::write(&file, instructions.to_string()).map_err(|e| e.to_string())?;
-    Ok(Some(file))
+    Ok(Some(instructions.to_string()))
 }
 
 pub fn build(input: &path::Path, stop_after: Option<CompileStep>) -> Result<(), String> {
-    let inter: IntermediateFile = IntermediateFile::new(IntermediateFileType::PREPROCESSED)?;
+    let inter = Builder::new()
+        .suffix(".i")
+        .tempfile()
+        .map_err(|e| format!("Failed to '.i' file: {e}"))?;
 
     let mut cmd = process::Command::new("gcc");
-    let cmd = cmd.args(["-E", "-P"]).arg(input).arg("-o").arg(&inter);
+    let cmd = cmd
+        .args(["-E", "-P"])
+        .arg(input)
+        .arg("-o")
+        .arg(inter.path());
 
-    let inter = match cmd.status() {
+    let inter: NamedTempFile = match cmd.status() {
         Ok(status) if status.success() => Ok(inter),
         Ok(status) => Err(format!("Preprocessing failed with exit status: {status}")),
         Err(e) => Err(format!("Failed to execute preprocessing command: {e}")),
-    };
+    }?;
 
-    if let Some(file) = compile(inter?, stop_after)? {
-        let out = input.parent().unwrap().join(input.file_name().unwrap());
+    if let Some(instrs) = compile(inter, stop_after)? {
+        let src = Builder::new()
+            .suffix(".s")
+            .tempfile()
+            .map_err(|e| format!("Failed to '.s' file: {e}"))?;
+
+        let dst = input.parent().unwrap().join(input.file_stem().unwrap());
+        fs::write(src.path(), instrs).map_err(|e| e.to_string())?;
 
         let mut cmd = process::Command::new("gcc");
-        let cmd = cmd.arg(file).arg("-o").arg(out);
+        let cmd = cmd.arg(src.path()).arg("-o").arg(dst);
 
         match cmd.status() {
             Ok(status) if status.success() => Ok(()),

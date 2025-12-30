@@ -68,19 +68,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2261d10cca569e4643e526d8dc2e62e433cc8aba21ab764233731f8d369bf394"
 
 [[package]]
-name = "ccr"
-version = "0.1.0"
-dependencies = [
- "clap",
- "nanoid",
- "nanoid-dictionary",
- "regex",
- "tempfile",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "cfg-if"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -227,6 +214,19 @@ name = "nanoid-dictionary"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c6e9131c818f6826271c255f7323d1fcc9332c54b7cfb6c664ec506595d5d8e"
+
+[[package]]
+name = "nora"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "nanoid",
+ "nanoid-dictionary",
+ "regex",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "nu-ansi-term"
