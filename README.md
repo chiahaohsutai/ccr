@@ -1,6 +1,6 @@
-# Sandglass
+# NORA
 
-Sandglass is a C compiler implemented in Rust, based on the curriculum from Nora Sandler’s [Writing a C Compiler: Build a Real Programming Language from Scratch](https://nostarch.com/writing-c-compiler).
+NORA is a C compiler implemented in Rust, based on the curriculum from Nora Sandler’s [Writing a C Compiler: Build a Real Programming Language from Scratch](https://nostarch.com/writing-c-compiler).
 
 This project presents a full implementation of the compiler described in the text. It supports a subset of the C language, including arithmetic expressions, bitwise operations, and control-flow statements. The compiler is structured into five compilation stages:
 
