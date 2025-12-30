@@ -1,8 +1,10 @@
-use ccr::CompileStep;
 use clap::{ArgGroup, Command, Id, arg};
-use std::{path, process};
 use tracing::{Level, error};
 use tracing_subscriber::FmtSubscriber;
+
+use std::{path, process};
+
+use ccr::CompileStep;
 
 fn init_loggging(level: Level) {
     let subscriber = FmtSubscriber::builder().with_max_level(level).finish();

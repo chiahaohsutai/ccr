@@ -1,5 +1,8 @@
+use nanoid::nanoid;
+use nanoid_dictionary::ALPHANUMERIC;
+
 use core::fmt;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use super::tokenizer;
 
@@ -142,6 +145,10 @@ pub enum Factor {
 }
 
 impl Factor {
+    fn is_identifier(&self) -> bool {
+        matches!(self, Self::IDENTIFIER(_))
+    }
+
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
             Some(tokenizer::Token::IDENTIFIER(name)) => Ok(Self::IDENTIFIER(name)),
@@ -164,6 +171,24 @@ impl Factor {
             tkn => Err(format!("Malformed factor, found {tkn:?}.")),
         }
     }
+
+    fn resolve(factor: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
+        match factor {
+            Self::IDENTIFIER(ident) => match variables.get(&ident) {
+                Some(ident) => Ok(Self::IDENTIFIER(String::from(ident))),
+                None => Err(String::from("Undeclared variable")),
+            },
+            Self::EXPRESSION(expr) => {
+                let expr = Box::new(Expression::resolve(*expr, variables)?);
+                Ok(Self::EXPRESSION(expr))
+            }
+            Self::UNARY(op, factor) => {
+                let factor = Box::new(Factor::resolve(*factor, variables)?);
+                Ok(Self::UNARY(op, factor))
+            }
+            factor => Ok(factor),
+        }
+    }
 }
 
 impl fmt::Display for Factor {
@@ -184,6 +209,13 @@ pub enum Expression {
 }
 
 impl Expression {
+    fn is_identifier(&self) -> bool {
+        match self {
+            Self::FACTOR(f) if f.is_identifier() => true,
+            _ => false,
+        }
+    }
+
     fn parse(tokens: &mut VecDeque<tokenizer::Token>, precedence: u64) -> Result<Self, String> {
         let mut lhs = Expression::FACTOR(Factor::parse(tokens)?);
 
@@ -205,6 +237,22 @@ impl Expression {
         }
         Ok(lhs)
     }
+
+    fn resolve(expression: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
+        match expression {
+            Self::FACTOR(factor) => Ok(Self::FACTOR(Factor::resolve(factor, variables)?)),
+            Self::BINARY(lhs, op, rhs) => match op {
+                BinaryOperator::ASSIGNMENT if !lhs.is_identifier() => {
+                    Err(String::from("Invalid lvalue in assignment"))
+                }
+                _ => {
+                    let lhs = Box::new(Expression::resolve(*lhs, variables)?);
+                    let rhs = Box::new(Expression::resolve(*rhs, variables)?);
+                    Ok(Expression::BINARY(lhs, op, rhs))
+                }
+            },
+        }
+    }
 }
 
 impl fmt::Display for Expression {
@@ -220,8 +268,19 @@ impl fmt::Display for Expression {
 pub struct Declaration(String, Option<Expression>);
 
 impl Declaration {
-    fn parse(tokens: VecDeque<tokenizer::Token>) {
-        todo!()
+    fn resolve(declaration: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
+        if variables.contains_key(&declaration.0) {
+            Err(String::from("Duplicate variable declaration"))
+        } else {
+            let name = nanoid!(21, ALPHANUMERIC);
+            variables.insert(String::from(&declaration.0), String::from(&name));
+            if let Some(expr) = declaration.1 {
+                let initializer = Expression::resolve(expr, variables)?;
+                Ok(Declaration(name, Some(initializer)))
+            } else {
+                Ok(Declaration(name, None))
+            }
+        }
     }
 }
 
@@ -233,8 +292,13 @@ pub enum Statement {
 }
 
 impl Statement {
-    fn parse(tokens: VecDeque<tokenizer::Token>) -> Result<Self, String> {
-        todo!()
+    fn resolve(statement: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
+        let stmt = match statement {
+            Self::EXPRESSION(expr) => Self::EXPRESSION(Expression::resolve(expr, variables)?),
+            Self::RETURN(expr) => Self::RETURN(Expression::resolve(expr, variables)?),
+            Self::NULL => Self::NULL,
+        };
+        Ok(stmt)
     }
 }
 
@@ -306,6 +370,15 @@ impl BlockItem {
             None => Err(String::from("Unexpected end of input while parsing body.")),
         }
     }
+
+    fn resolve(item: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
+        match item {
+            Self::Declaration(decl) => {
+                Ok(Self::Declaration(Declaration::resolve(decl, variables)?))
+            }
+            Self::Statement(stmt) => Ok(BlockItem::Statement(Statement::resolve(stmt, variables)?)),
+        }
+    }
 }
 
 impl fmt::Display for BlockItem {
@@ -363,6 +436,15 @@ impl Function {
             _ => Err(String::from("Expected 'int' keyword at the start of a fn.")),
         }
     }
+
+    fn resolve(function: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
+        let name = String::from(&function.0);
+        let mut items: Vec<BlockItem> = Vec::new();
+        for item in function.1 {
+            items.push(BlockItem::resolve(item, variables)?);
+        }
+        Ok(Function(name, items))
+    }
 }
 
 impl fmt::Display for Function {
@@ -402,4 +484,10 @@ pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
     } else {
         Err(String::from("Unexpected token after program end."))
     }
+}
+
+pub fn validate(ast: Program) -> Result<Program, String> {
+    let main = Function::from(ast);
+    let mut vars: HashMap<String, String> = HashMap::new();
+    Ok(Program(Function::resolve(main, &mut vars)?))
 }

@@ -1,7 +1,9 @@
-use super::parser;
 use nanoid::nanoid;
 use nanoid_dictionary::ALPHANUMERIC;
+
 use std::fmt;
+
+use super::parser;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {

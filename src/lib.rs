@@ -1,7 +1,7 @@
-use std::{ffi, fs, path, process};
 use tempfile::NamedTempFile;
 
-pub mod analysis;
+use std::{ffi, fs, path, process};
+
 pub mod codegen;
 pub mod parser;
 pub mod tacky;
@@ -75,17 +75,18 @@ fn compile<T: AsRef<path::Path>>(
     if matches!(stop_after, Some(CompileStep::LEX)) {
         return Ok(None);
     }
-
-    let program = parser::parse(tokens)?;
+    let ast = parser::parse(tokens)?;
     if matches!(stop_after, Some(CompileStep::PARSE)) {
         return Ok(None);
     };
-
-    let tac = tacky::Program::from(program.clone());
+    let ast = parser::validate(ast)?;
+    if matches!(stop_after, Some(CompileStep::VALIDATE)) {
+        return Ok(None);
+    }
+    let tac = tacky::Program::from(ast);
     if matches!(stop_after, Some(CompileStep::TACKY)) {
         return Ok(None);
     }
-
     let instructions = codegen::Program::from(tac);
     if matches!(stop_after, Some(CompileStep::CODEGEN)) {
         return Ok(None);
@@ -93,7 +94,6 @@ fn compile<T: AsRef<path::Path>>(
 
     let file: IntermediateFile = IntermediateFile::new(IntermediateFileType::ASSEMBLY)?;
     fs::write(&file, instructions.to_string()).map_err(|e| e.to_string())?;
-
     Ok(Some(file))
 }
 
