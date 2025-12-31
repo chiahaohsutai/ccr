@@ -1,70 +1,99 @@
-use regex::Regex;
+use std::str::FromStr;
+use std::{cmp, fmt, sync};
 
-use std::{cmp, fmt, str::FromStr, sync};
+use regex::Regex;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Operator {
-    DECREMENT,
-    NEGATION,
-    COMPLEMENT,
-    ADDITION,
-    PRODUCT,
-    DIVISION,
-    REMAINDER,
-    BITWISEAND,
-    BITWISEOR,
-    BITWISEXOR,
-    LEFTSHIFT,
-    RIGHTSHIFT,
-    NOT,
-    AND,
-    OR,
-    EQUAL,
-    NOTEQUAL,
-    LESSTHAN,
-    GREATERTHAN,
-    LESSEQUAL,
-    GREATEREQUAL,
-    ASSIGNMENT,
+    Decrement,
+    Negation,
+    Complement,
+    Addition,
+    Product,
+    Division,
+    Remainder,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    LeftShift,
+    RightShift,
+    LogicalNot,
+    LogicalAnd,
+    LogicalOr,
+    EqualEqual,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessThanOrEqual,
+    GreaterThanOrEqual,
+    Assignment,
+    AddAssignment,
+    SubAssignment,
+    DivAssignment,
+    ProdAssignment,
+    RemAssignment,
 }
 
 impl Operator {
+    /// Returns the length of the operator's textual representation.
     fn len(&self) -> usize {
         self.as_ref().len()
     }
 
+    /// Attempts to match an operator at the start of the input string.
+    ///
+    /// Matches the longest valid operator sequence and returns the corresponding
+    /// operator if successful. Returns `None` if the input does not begin with
+    /// a recognized operator.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let pattern = r"^(<=|>=|--|<<|>>|&&|\|\||==|!=|[\-~\+\*\/%&\|\^!><=])";
+            let pattern = r"^(<<=|>>=|\+=|-=|\*=|%=|&=|\|=|<=|>=|--|<<|>>|&&|\|\||==|!=|[\-~\+\*\/%&\|\^!><=])";
             Regex::new(pattern).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
     }
 
+    /// Returns `true` if this operator is a unary operator.
+    ///
+    /// Unary operators operate on a single operand.
     fn is_unary(&self) -> bool {
         match self {
-            Self::DECREMENT | Self::COMPLEMENT | Self::NOT => true,
+            Self::Decrement | Self::Complement | Self::LogicalNot => true,
             _ => false,
         }
     }
 
+    /// Returns `true` if this operator is a binary operator.
+    ///
+    /// Binary operators operate on two operands.
     fn is_binary(&self) -> bool {
         !self.is_unary()
     }
 
+    /// Returns the precedence level of this operator.
+    ///
+    /// Higher values indicate higher precedence. Operators that do not participate
+    /// in expression precedence return `0`.
     fn precedence(&self) -> u64 {
         match self {
-            Self::ASSIGNMENT => 1,
-            Self::OR => 5,
-            Self::AND => 10,
-            Self::BITWISEOR => 15,
-            Self::BITWISEXOR => 20,
-            Self::BITWISEAND => 25,
-            Self::EQUAL | Self::NOTEQUAL => 30,
-            Self::LESSTHAN | Self::GREATERTHAN | Self::LESSEQUAL | Self::GREATEREQUAL => 35,
-            Self::RIGHTSHIFT | Self::LEFTSHIFT => 40,
-            Self::ADDITION | Self::NEGATION => 45,
-            Self::PRODUCT | Self::DIVISION | Self::REMAINDER => 50,
+            Self::Assignment
+            | Self::SubAssignment
+            | Self::DivAssignment
+            | Self::AddAssignment
+            | Self::RemAssignment => 1,
+            Self::LogicalOr => 5,
+            Self::LogicalAnd => 10,
+            Self::BitwiseOr => 15,
+            Self::BitwiseXor => 20,
+            Self::BitwiseAnd => 25,
+            Self::EqualEqual | Self::NotEqual => 30,
+            Self::LessThan
+            | Self::GreaterThan
+            | Self::LessThanOrEqual
+            | Self::GreaterThanOrEqual => 35,
+            Self::RightShift | Self::LeftShift => 40,
+            Self::Addition | Self::Negation => 45,
+            Self::Product | Self::Division | Self::Remainder => 50,
             _ => 0,
         }
     }
@@ -73,28 +102,33 @@ impl Operator {
 impl AsRef<str> for Operator {
     fn as_ref(&self) -> &str {
         match self {
-            Self::DECREMENT => "--",
-            Self::NEGATION => "-",
-            Self::COMPLEMENT => "~",
-            Self::ADDITION => "+",
-            Self::PRODUCT => "*",
-            Self::DIVISION => "/",
-            Self::REMAINDER => "%",
-            Self::BITWISEAND => "&",
-            Self::BITWISEOR => "|",
-            Self::BITWISEXOR => "^",
-            Self::LEFTSHIFT => "<<",
-            Self::RIGHTSHIFT => ">>",
-            Self::NOT => "!",
-            Self::AND => "&&",
-            Self::OR => "||",
-            Self::EQUAL => "==",
-            Self::NOTEQUAL => "!=",
-            Self::LESSTHAN => "<",
-            Self::GREATERTHAN => ">",
-            Self::LESSEQUAL => "<=",
-            Self::GREATEREQUAL => ">=",
-            Self::ASSIGNMENT => "=",
+            Self::Decrement => "--",
+            Self::Negation => "-",
+            Self::Complement => "~",
+            Self::Addition => "+",
+            Self::Product => "*",
+            Self::Division => "/",
+            Self::Remainder => "%",
+            Self::BitwiseAnd => "&",
+            Self::BitwiseOr => "|",
+            Self::BitwiseXor => "^",
+            Self::LeftShift => "<<",
+            Self::RightShift => ">>",
+            Self::LogicalNot => "!",
+            Self::LogicalAnd => "&&",
+            Self::LogicalOr => "||",
+            Self::EqualEqual => "==",
+            Self::NotEqual => "!=",
+            Self::LessThan => "<",
+            Self::GreaterThan => ">",
+            Self::LessThanOrEqual => "<=",
+            Self::GreaterThanOrEqual => ">=",
+            Self::Assignment => "=",
+            Self::AddAssignment => "+=",
+            Self::SubAssignment => "-=",
+            Self::DivAssignment => "/=",
+            Self::ProdAssignment => "*=",
+            Self::RemAssignment => "%=",
         }
     }
 }
@@ -104,28 +138,33 @@ impl FromStr for Operator {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "--" => Ok(Self::DECREMENT),
-            "-" => Ok(Self::NEGATION),
-            "~" => Ok(Self::COMPLEMENT),
-            "+" => Ok(Self::ADDITION),
-            "*" => Ok(Self::PRODUCT),
-            "/" => Ok(Self::DIVISION),
-            "%" => Ok(Self::REMAINDER),
-            "&" => Ok(Self::BITWISEAND),
-            "|" => Ok(Self::BITWISEOR),
-            "^" => Ok(Self::BITWISEXOR),
-            "<<" => Ok(Self::LEFTSHIFT),
-            ">>" => Ok(Self::RIGHTSHIFT),
-            "!" => Ok(Self::NOT),
-            "&&" => Ok(Self::AND),
-            "||" => Ok(Self::OR),
-            "==" => Ok(Self::EQUAL),
-            "!=" => Ok(Self::NOTEQUAL),
-            "<" => Ok(Self::LESSTHAN),
-            ">" => Ok(Self::GREATERTHAN),
-            "<=" => Ok(Self::LESSEQUAL),
-            ">=" => Ok(Self::GREATEREQUAL),
-            "=" => Ok(Self::ASSIGNMENT),
+            "--" => Ok(Self::Decrement),
+            "-" => Ok(Self::Negation),
+            "~" => Ok(Self::Complement),
+            "+" => Ok(Self::Addition),
+            "*" => Ok(Self::Product),
+            "/" => Ok(Self::Division),
+            "%" => Ok(Self::Remainder),
+            "&" => Ok(Self::BitwiseAnd),
+            "|" => Ok(Self::BitwiseOr),
+            "^" => Ok(Self::BitwiseXor),
+            "<<" => Ok(Self::LeftShift),
+            ">>" => Ok(Self::RightShift),
+            "!" => Ok(Self::LogicalNot),
+            "&&" => Ok(Self::LogicalAnd),
+            "||" => Ok(Self::LogicalOr),
+            "==" => Ok(Self::EqualEqual),
+            "!=" => Ok(Self::NotEqual),
+            "<" => Ok(Self::LessThan),
+            ">" => Ok(Self::GreaterThan),
+            "<=" => Ok(Self::LessThanOrEqual),
+            ">=" => Ok(Self::GreaterThanOrEqual),
+            "=" => Ok(Self::Assignment),
+            "+=" => Ok(Self::AddAssignment),
+            "-=" => Ok(Self::SubAssignment),
+            "*=" => Ok(Self::ProdAssignment),
+            "/=" => Ok(Self::DivAssignment),
+            "%=" => Ok(Self::RemAssignment),
             _ => Err(format!("Unknown operator: {}", s)),
         }
     }
@@ -139,16 +178,21 @@ impl fmt::Display for Operator {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Keyword {
-    INT,
-    VOID,
-    RETURN,
+    Int,
+    Void,
+    Return,
 }
 
 impl Keyword {
+    /// Returns the length of the keyword's textual representation.
     fn len(&self) -> usize {
         self.as_ref().len()
     }
 
+    /// Attempts to match a keyword at the start of the input string.
+    ///
+    /// If the input begins with a reserved keyword, returns the corresponding
+    /// keyword value. Otherwise, returns `None`.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
             let pattern = r"^(int|void|return)\b";
@@ -161,9 +205,9 @@ impl Keyword {
 impl AsRef<str> for Keyword {
     fn as_ref(&self) -> &str {
         match self {
-            Self::INT => "int",
-            Self::VOID => "void",
-            Self::RETURN => "return",
+            Self::Int => "int",
+            Self::Void => "void",
+            Self::Return => "return",
         }
     }
 }
@@ -173,9 +217,9 @@ impl FromStr for Keyword {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "int" => Ok(Self::INT),
-            "void" => Ok(Self::VOID),
-            "return" => Ok(Self::RETURN),
+            "int" => Ok(Self::Int),
+            "void" => Ok(Self::Void),
+            "return" => Ok(Self::Return),
             _ => Err(format!("Unknown keyword: {}", s)),
         }
     }
@@ -189,18 +233,23 @@ impl fmt::Display for Keyword {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Delimiter {
-    LPAREN,
-    RPAREN,
-    SEMICOLON,
-    LBRACE,
-    RBRACE,
+    LeftParen,
+    RightParen,
+    Semicolon,
+    LeftBrace,
+    RightBrace,
 }
 
 impl Delimiter {
+    /// Returns the length of the delimiter's textual representation.
     fn len(&self) -> usize {
         self.as_ref().len()
     }
 
+    /// Attempts to match a delimiter at the start of the input string.
+    ///
+    /// If the input begins with a valid delimiter character, returns the
+    /// corresponding delimiter value. Otherwise, returns `None`.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
             let pattern = r"^[\(\);\{\}]";
@@ -213,11 +262,11 @@ impl Delimiter {
 impl AsRef<str> for Delimiter {
     fn as_ref(&self) -> &str {
         match self {
-            Self::LPAREN => "(",
-            Self::RPAREN => ")",
-            Self::SEMICOLON => ";",
-            Self::LBRACE => "{",
-            Self::RBRACE => "}",
+            Self::LeftParen => "(",
+            Self::RightParen => ")",
+            Self::Semicolon => ";",
+            Self::LeftBrace => "{",
+            Self::RightBrace => "}",
         }
     }
 }
@@ -227,11 +276,11 @@ impl FromStr for Delimiter {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "(" => Ok(Self::LPAREN),
-            ")" => Ok(Self::RPAREN),
-            ";" => Ok(Self::SEMICOLON),
-            "{" => Ok(Self::LBRACE),
-            "}" => Ok(Self::RBRACE),
+            "(" => Ok(Self::LeftParen),
+            ")" => Ok(Self::RightParen),
+            ";" => Ok(Self::Semicolon),
+            "{" => Ok(Self::LeftBrace),
+            "}" => Ok(Self::RightBrace),
             _ => Err(format!("Unknown delimiter: {}", s)),
         }
     }
@@ -245,78 +294,110 @@ impl fmt::Display for Delimiter {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    CONSTANT(u64),
-    KEYWORD(Keyword),
-    IDENTIFIER(String),
-    OPERATOR(Operator),
-    DELIMITER(Delimiter),
+    Constant(u64),
+    Keyword(Keyword),
+    Identifier(String),
+    Operator(Operator),
+    Delimiter(Delimiter),
 }
 
 impl Token {
+    /// Returns `true` if this token represents a binary operator.
+    ///
+    /// Non-operator tokens and unary operators return `false`.
     pub fn is_binary_operator(&self) -> bool {
         match self {
-            Token::OPERATOR(op) => op.is_binary(),
+            Token::Operator(op) => op.is_binary(),
             _ => false,
         }
     }
 
+    /// Returns the precedence level of this token.
+    ///
+    /// If the token is an operator, its precedence value is returned.
+    /// Non-operator tokens have a precedence of `0`.
     pub fn precedence(&self) -> u64 {
         match self {
-            Token::OPERATOR(op) => op.precedence(),
+            Token::Operator(op) => op.precedence(),
             _ => 0,
         }
     }
 
+    /// Returns the length of the token's textual representation.
+    ///
+    /// The length corresponds to the number of characters consumed from
+    /// the input source when this token was lexed.
     fn len(&self) -> usize {
         match self {
-            Self::CONSTANT(c) => c.to_string().len(),
-            Self::DELIMITER(d) => d.len(),
-            Self::IDENTIFIER(i) => i.len(),
-            Self::KEYWORD(k) => k.len(),
-            Self::OPERATOR(o) => o.len(),
+            Self::Constant(c) => c.to_string().len(),
+            Self::Delimiter(d) => d.len(),
+            Self::Identifier(i) => i.len(),
+            Self::Keyword(k) => k.len(),
+            Self::Operator(o) => o.len(),
         }
     }
-
+    /// Attempts to match a token at the start of the input string.
+    ///
+    /// Returns the first token whose pattern matches the beginning of `input`,
+    /// or `None` if no valid token is found.
     fn match_token(input: &str) -> Option<Self> {
         Keyword::find_match(input)
-            .map(|kw| Token::KEYWORD(kw))
+            .map(|kw| Token::Keyword(kw))
             .or_else(|| Self::match_identifier(input))
             .or_else(|| Self::match_constant(input))
-            .or_else(|| Delimiter::find_match(input).map(|delim| Token::DELIMITER(delim)))
-            .or_else(|| Operator::find_match(input).map(|op| Token::OPERATOR(op)))
+            .or_else(|| Delimiter::find_match(input).map(|delim| Token::Delimiter(delim)))
+            .or_else(|| Operator::find_match(input).map(|op| Token::Operator(op)))
     }
 
+    /// Attempts to match an identifier at the start of the input string.
+    ///
+    /// An identifier must begin with an alphabetic character followed by
+    /// alphanumeric characters or underscores. Returns a `Token::Identifier`
+    /// containing the matched lexeme if successful, or `None` otherwise.
     fn match_identifier(input: &str) -> Option<Token> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
             let pattern = r"^([a-zA-Z]\w*)\b";
             Regex::new(pattern).unwrap()
         });
         RE.find(input)
-            .map(|m| Token::IDENTIFIER(String::from(m.as_str())))
+            .map(|m| Token::Identifier(String::from(m.as_str())))
     }
 
+    /// Attempts to match an integer constant at the start of the input string.
+    ///
+    /// Matches a sequence of decimal digits and returns a `Token::Constant`
+    /// containing the parsed value if successful, or `None` if no match is found.
     fn match_constant(input: &str) -> Option<Token> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
             let pattern = r"^([0-9]+)\b";
             Regex::new(pattern).unwrap()
         });
         RE.find(input)
-            .map(|m| Token::CONSTANT(m.as_str().parse().unwrap()))
+            .map(|m| Token::Constant(m.as_str().parse().unwrap()))
     }
 }
 
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Token::CONSTANT(value) => write!(f, "{}", value),
-            Token::KEYWORD(kw) => write!(f, "{}", kw),
-            Token::IDENTIFIER(name) => write!(f, "{}", name),
-            Token::OPERATOR(op) => write!(f, "{}", op),
-            Token::DELIMITER(delim) => write!(f, "{}", delim),
+            Token::Constant(value) => write!(f, "{}", value),
+            Token::Keyword(kw) => write!(f, "{}", kw),
+            Token::Identifier(name) => write!(f, "{}", name),
+            Token::Operator(op) => write!(f, "{}", op),
+            Token::Delimiter(delim) => write!(f, "{}", delim),
         }
     }
 }
 
+/// Tokenizes the input source string into a sequence of tokens.
+///
+/// Iterates through the input, skipping whitespace and repeatedly matching
+/// the longest valid token at the current position. Returns a vector of tokens
+/// in source order if successful.
+///
+/// # Errors
+/// Returns an error if no valid token can be matched at the current position,
+/// including a short preview of the unrecognized input.
 pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
     let chars = input.chars().collect::<Vec<char>>();
     let mut tokens = Vec::new();
