@@ -85,8 +85,8 @@ impl fmt::Display for UnaryOperator {
 impl From<tacky::UnaryOperator> for UnaryOperator {
     fn from(op: tacky::UnaryOperator) -> Self {
         match op {
-            tacky::UnaryOperator::NEGATE => UnaryOperator::NEG,
-            tacky::UnaryOperator::COMPLEMENT => UnaryOperator::NOT,
+            tacky::UnaryOperator::Negation => UnaryOperator::NEG,
+            tacky::UnaryOperator::Complement => UnaryOperator::NOT,
             _ => todo!(),
         }
     }
@@ -284,7 +284,7 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
             instructions.push(Instruction::MOV(op, Operand::REG(Register::AX)));
             instructions.push(Instruction::RET);
         }
-        tacky::Instruction::UNARY(tacky::UnaryOperator::NOT, src, dst) => {
+        tacky::Instruction::UNARY(tacky::UnaryOperator::LogicalNot, src, dst) => {
             let dst = Operand::from(dst);
             instructions.push(Instruction::CMP(Operand::IMM(0), Operand::from(src)));
             instructions.push(Instruction::MOV(Operand::IMM(0), dst.clone()));

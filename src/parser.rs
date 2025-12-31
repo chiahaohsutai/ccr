@@ -6,11 +6,12 @@ use nanoid_dictionary::ALPHANUMERIC;
 
 use super::tokenizer;
 
+/// Represents unary operators that operate on a single operand.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
-    NOT,
-    NEGATE,
-    COMPLEMENT,
+    Negation,
+    LogicalNot,
+    Complement,
 }
 
 impl TryFrom<tokenizer::Operator> for UnaryOperator {
@@ -18,9 +19,9 @@ impl TryFrom<tokenizer::Operator> for UnaryOperator {
 
     fn try_from(op: tokenizer::Operator) -> Result<Self, Self::Error> {
         match op {
-            tokenizer::Operator::Negation => Ok(Self::NEGATE),
-            tokenizer::Operator::Complement => Ok(Self::COMPLEMENT),
-            tokenizer::Operator::LogicalNot => Ok(Self::NOT),
+            tokenizer::Operator::Negation => Ok(Self::Negation),
+            tokenizer::Operator::Complement => Ok(Self::Complement),
+            tokenizer::Operator::LogicalNot => Ok(Self::LogicalNot),
             _ => Err(format!("Operator '{op}' is not a unary operator.")),
         }
     }
@@ -40,34 +41,45 @@ impl TryFrom<tokenizer::Token> for UnaryOperator {
 impl fmt::Display for UnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NOT => write!(f, "!"),
-            Self::NEGATE => write!(f, "-"),
-            Self::COMPLEMENT => write!(f, "~"),
+            Self::Negation => write!(f, "-"),
+            Self::LogicalNot => write!(f, "!"),
+            Self::Complement => write!(f, "~"),
         }
     }
 }
 
+/// Represents binary operators that operate on two operands.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOperator {
-    ADD,
-    DIVIDE,
-    SUBTRACT,
-    MULTIPLY,
-    REMAINDER,
-    BITWISEOR,
-    BITWISEAND,
-    BITWISEXOR,
-    LEFTSHIFT,
-    RIGHTSHIFT,
-    AND,
-    OR,
-    EQUAL,
-    NOTEQUAL,
-    LESSTHAN,
-    GREATERTHAN,
-    LESSEQUAL,
-    GREATEREQUAL,
-    ASSIGNMENT,
+    Add,
+    Divide,
+    Substract,
+    Multiply,
+    Remainder,
+    BitwiseOr,
+    BitwiseAnd,
+    BitwiseXor,
+    LeftShift,
+    RightShift,
+    LogicalAnd,
+    LogicalOr,
+    EqualEqual,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessThanOrEq,
+    GreaterThanOrEq,
+    Assignment,
+    AddAssignment,
+    SubAssignment,
+    DivAssignment,
+    ProdAssignment,
+    RemAssignment,
+    AndAssignment,
+    OrAssignment,
+    XorAssignment,
+    LShiftAssignment,
+    RShiftAssignment,
 }
 
 impl TryFrom<tokenizer::Operator> for BinaryOperator {
@@ -75,25 +87,35 @@ impl TryFrom<tokenizer::Operator> for BinaryOperator {
 
     fn try_from(op: tokenizer::Operator) -> Result<Self, Self::Error> {
         match op {
-            tokenizer::Operator::Addition => Ok(Self::ADD),
-            tokenizer::Operator::Negation => Ok(Self::SUBTRACT),
-            tokenizer::Operator::Product => Ok(Self::MULTIPLY),
-            tokenizer::Operator::Division => Ok(Self::DIVIDE),
-            tokenizer::Operator::Remainder => Ok(Self::REMAINDER),
-            tokenizer::Operator::BitwiseAnd => Ok(Self::BITWISEAND),
-            tokenizer::Operator::BitwiseOr => Ok(Self::BITWISEOR),
-            tokenizer::Operator::BitwiseXor => Ok(Self::BITWISEXOR),
-            tokenizer::Operator::LeftShift => Ok(Self::LEFTSHIFT),
-            tokenizer::Operator::RightShift => Ok(Self::RIGHTSHIFT),
-            tokenizer::Operator::LogicalAnd => Ok(Self::AND),
-            tokenizer::Operator::LogicalOr => Ok(Self::OR),
-            tokenizer::Operator::EqualEqual => Ok(Self::EQUAL),
-            tokenizer::Operator::NotEqual => Ok(Self::NOTEQUAL),
-            tokenizer::Operator::LessThan => Ok(Self::LESSTHAN),
-            tokenizer::Operator::GreaterThan => Ok(Self::GREATERTHAN),
-            tokenizer::Operator::LessThanOrEqual => Ok(Self::LESSEQUAL),
-            tokenizer::Operator::GreaterThanOrEqual => Ok(Self::GREATEREQUAL),
-            tokenizer::Operator::Assignment => Ok(Self::ASSIGNMENT),
+            tokenizer::Operator::Addition => Ok(Self::Add),
+            tokenizer::Operator::Negation => Ok(Self::Substract),
+            tokenizer::Operator::Product => Ok(Self::Multiply),
+            tokenizer::Operator::Division => Ok(Self::Divide),
+            tokenizer::Operator::Remainder => Ok(Self::Remainder),
+            tokenizer::Operator::BitwiseAnd => Ok(Self::BitwiseAnd),
+            tokenizer::Operator::BitwiseOr => Ok(Self::BitwiseOr),
+            tokenizer::Operator::BitwiseXor => Ok(Self::BitwiseXor),
+            tokenizer::Operator::LeftShift => Ok(Self::LeftShift),
+            tokenizer::Operator::RightShift => Ok(Self::RightShift),
+            tokenizer::Operator::LogicalAnd => Ok(Self::LogicalAnd),
+            tokenizer::Operator::LogicalOr => Ok(Self::LogicalOr),
+            tokenizer::Operator::EqualEqual => Ok(Self::EqualEqual),
+            tokenizer::Operator::NotEqual => Ok(Self::NotEqual),
+            tokenizer::Operator::LessThan => Ok(Self::LessThan),
+            tokenizer::Operator::GreaterThan => Ok(Self::GreaterThan),
+            tokenizer::Operator::LessThanOrEq => Ok(Self::LessThanOrEq),
+            tokenizer::Operator::GreaterThanOrEq => Ok(Self::GreaterThanOrEq),
+            tokenizer::Operator::Assignment => Ok(Self::Assignment),
+            tokenizer::Operator::AddAssignment => Ok(Self::AddAssignment),
+            tokenizer::Operator::SubAssignment => Ok(Self::SubAssignment),
+            tokenizer::Operator::DivAssignment => Ok(Self::DivAssignment),
+            tokenizer::Operator::RemAssignment => Ok(Self::RemAssignment),
+            tokenizer::Operator::ProdAssignment => Ok(Self::ProdAssignment),
+            tokenizer::Operator::AndAssignment => Ok(Self::AndAssignment),
+            tokenizer::Operator::OrAssignment => Ok(Self::OrAssignment),
+            tokenizer::Operator::XorAssignment => Ok(Self::XorAssignment),
+            tokenizer::Operator::LShiftAssignment => Ok(Self::LShiftAssignment),
+            tokenizer::Operator::RShiftAssignment => Ok(Self::RShiftAssignment),
             _ => Err(format!("Operator '{op}' is not a binary operator.")),
         }
     }
@@ -113,57 +135,77 @@ impl TryFrom<tokenizer::Token> for BinaryOperator {
 impl fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ADD => write!(f, "+"),
-            Self::SUBTRACT => write!(f, "-"),
-            Self::MULTIPLY => write!(f, "*"),
-            Self::DIVIDE => write!(f, "/"),
-            Self::REMAINDER => write!(f, "%"),
-            Self::BITWISEAND => write!(f, "&"),
-            Self::BITWISEOR => write!(f, "|"),
-            Self::BITWISEXOR => write!(f, "^"),
-            Self::LEFTSHIFT => write!(f, "<<"),
-            Self::RIGHTSHIFT => write!(f, ">>"),
-            Self::AND => write!(f, "&&"),
-            Self::OR => write!(f, "||"),
-            Self::EQUAL => write!(f, "=="),
-            Self::NOTEQUAL => write!(f, "!="),
-            Self::LESSTHAN => write!(f, "<"),
-            Self::GREATERTHAN => write!(f, ">"),
-            Self::LESSEQUAL => write!(f, "<="),
-            Self::GREATEREQUAL => write!(f, ">="),
-            Self::ASSIGNMENT => write!(f, "="),
+            Self::Add => write!(f, "+"),
+            Self::Substract => write!(f, "-"),
+            Self::Multiply => write!(f, "*"),
+            Self::Divide => write!(f, "/"),
+            Self::Remainder => write!(f, "%"),
+            Self::BitwiseAnd => write!(f, "&"),
+            Self::BitwiseOr => write!(f, "|"),
+            Self::BitwiseXor => write!(f, "^"),
+            Self::LeftShift => write!(f, "<<"),
+            Self::RightShift => write!(f, ">>"),
+            Self::LogicalAnd => write!(f, "&&"),
+            Self::LogicalOr => write!(f, "||"),
+            Self::EqualEqual => write!(f, "=="),
+            Self::NotEqual => write!(f, "!="),
+            Self::LessThan => write!(f, "<"),
+            Self::GreaterThan => write!(f, ">"),
+            Self::LessThanOrEq => write!(f, "<="),
+            Self::GreaterThanOrEq => write!(f, ">="),
+            Self::Assignment => write!(f, "="),
+            Self::AddAssignment => write!(f, "+="),
+            Self::SubAssignment => write!(f, "-="),
+            Self::RemAssignment => write!(f, "%="),
+            Self::DivAssignment => write!(f, "/="),
+            Self::ProdAssignment => write!(f, "*="),
+            Self::AndAssignment => write!(f, "&="),
+            Self::OrAssignment => write!(f, "|="),
+            Self::XorAssignment => write!(f, "^="),
+            Self::LShiftAssignment => write!(f, "<<="),
+            Self::RShiftAssignment => write!(f, ">>="),
         }
     }
 }
 
+/// Represents a factor in an expression.
+///
+/// A factor is the smallest unit in an expression and may be a constant,
+/// identifier, unary expression, or a parenthesized subexpression.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Factor {
-    INT(u64),
-    IDENTIFIER(String),
-    UNARY(UnaryOperator, Box<Factor>),
-    EXPRESSION(Box<Expression>),
+    Int(u64),
+    Identifier(String),
+    Unary(UnaryOperator, Box<Factor>),
+    Expression(Box<Expression>),
 }
 
 impl Factor {
+    /// Returns `true` if this factor is an identifier.
     fn is_identifier(&self) -> bool {
-        matches!(self, Self::IDENTIFIER(_))
+        matches!(self, Self::Identifier(_))
     }
 
+    /// Parses a factor from the front of the token stream.
+    ///
+    /// A factor may be a constant, identifier, unary expression, or a
+    /// parenthesized expression. Consumes the tokens required to form
+    /// the factor and returns an error if the input is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
-            Some(tokenizer::Token::Identifier(name)) => Ok(Self::IDENTIFIER(name)),
-            Some(tokenizer::Token::Constant(value)) => Ok(Self::INT(value)),
+            Some(tokenizer::Token::Identifier(name)) => Ok(Self::Identifier(name)),
+            Some(tokenizer::Token::Constant(value)) => Ok(Self::Int(value)),
             Some(tokenizer::Token::Operator(op)) => {
                 let factor = Box::new(Self::parse(tokens)?);
                 UnaryOperator::try_from(op)
                     .map_err(|_| format!("Unexpected unary operator '{}' in factor.", op))
-                    .map(|op| Self::UNARY(op, factor))
+                    .map(|op| Self::Unary(op, factor))
             }
             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
                 let expr = Expression::parse(tokens, 0)?;
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
-                        Ok(Self::EXPRESSION(Box::new(expr)))
+                        Ok(Self::Expression(Box::new(expr)))
                     }
                     _ => Err(String::from("Expected ')' after expression.")),
                 }
@@ -172,19 +214,24 @@ impl Factor {
         }
     }
 
+    /// Resolves identifiers within the factor using the provided symbol table.
+    ///
+    /// Replaces identifiers with their resolved values, recursively resolving
+    /// nested expressions and unary factors. Returns an error if an identifier
+    /// is undeclared.
     fn resolve(factor: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match factor {
-            Self::IDENTIFIER(ident) => match variables.get(&ident) {
-                Some(ident) => Ok(Self::IDENTIFIER(String::from(ident))),
+            Self::Identifier(ident) => match variables.get(&ident) {
+                Some(ident) => Ok(Self::Identifier(String::from(ident))),
                 None => Err(String::from("Undeclared variable")),
             },
-            Self::EXPRESSION(expr) => {
+            Self::Expression(expr) => {
                 let expr = Box::new(Expression::resolve(*expr, variables)?);
-                Ok(Self::EXPRESSION(expr))
+                Ok(Self::Expression(expr))
             }
-            Self::UNARY(op, factor) => {
+            Self::Unary(op, factor) => {
                 let factor = Box::new(Factor::resolve(*factor, variables)?);
-                Ok(Self::UNARY(op, factor))
+                Ok(Self::Unary(op, factor))
             }
             factor => Ok(factor),
         }
@@ -194,14 +241,18 @@ impl Factor {
 impl fmt::Display for Factor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::INT(n) => write!(f, "{n}"),
-            Self::UNARY(op, fac) => write!(f, "{op}{fac}"),
-            Self::EXPRESSION(e) => write!(f, "({e})"),
-            Self::IDENTIFIER(i) => write!(f, "{i}"),
+            Self::Int(n) => write!(f, "{n}"),
+            Self::Unary(op, fac) => write!(f, "{op}{fac}"),
+            Self::Expression(e) => write!(f, "({e})"),
+            Self::Identifier(i) => write!(f, "{i}"),
         }
     }
 }
 
+/// Represents an expression node in the abstract syntax tree.
+///
+/// An expression may be a single factor or a binary operation composed
+/// of two subexpressions and a binary operator.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     FACTOR(Factor),
@@ -209,6 +260,7 @@ pub enum Expression {
 }
 
 impl Expression {
+    /// Returns `true` if this expression resolves to an identifier.
     fn is_identifier(&self) -> bool {
         match self {
             Self::FACTOR(f) if f.is_identifier() => true,
@@ -216,6 +268,11 @@ impl Expression {
         }
     }
 
+    /// Parses an expression from the token stream using precedence climbing.
+    ///
+    /// Constructs an expression tree by repeatedly parsing binary operators
+    /// according to their precedence. Tokens are consumed from the front of
+    /// the stream. Returns an error if the expression is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>, precedence: u64) -> Result<Self, String> {
         let mut lhs = Expression::FACTOR(Factor::parse(tokens)?);
 
@@ -228,7 +285,7 @@ impl Expression {
 
             if let tokenizer::Token::Operator(tokenizer::Operator::Assignment) = token {
                 let rhs = Expression::parse(tokens, precedence)?;
-                lhs = Self::BINARY(Box::new(lhs), BinaryOperator::ASSIGNMENT, Box::new(rhs));
+                lhs = Self::BINARY(Box::new(lhs), BinaryOperator::Assignment, Box::new(rhs));
             } else {
                 let rhs = Expression::parse(tokens, precedence + 1)?;
                 let op = BinaryOperator::try_from(token).unwrap();
@@ -238,11 +295,18 @@ impl Expression {
         Ok(lhs)
     }
 
+    /// Resolves identifiers within the expression using the provided symbol table.
+    ///
+    /// Recursively resolves all subexpressions and validates assignment targets.
+    ///
+    /// # Errors
+    /// Returns an error if an assignment has an invalid left-hand side or if
+    /// an identifier cannot be resolved.
     fn resolve(expression: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match expression {
             Self::FACTOR(factor) => Ok(Self::FACTOR(Factor::resolve(factor, variables)?)),
             Self::BINARY(lhs, op, rhs) => match op {
-                BinaryOperator::ASSIGNMENT if !lhs.is_identifier() => {
+                BinaryOperator::Assignment if !lhs.is_identifier() => {
                     Err(String::from("Invalid lvalue in assignment"))
                 }
                 _ => {
@@ -264,18 +328,29 @@ impl fmt::Display for Expression {
     }
 }
 
+/// Represents a variable declaration.
+///
+/// A declaration consists of an identifier and an optional initializer
+/// expression.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Declaration(String, Option<Expression>);
 
 impl Declaration {
+    /// Returns the declared variable name.
     pub fn name(&self) -> &str {
         &self.0
     }
 
+    /// Returns the initializer expression, if one is present.
     pub fn initializer(self) -> Option<Expression> {
         self.1
     }
 
+    /// Resolves a variable declaration within the given symbol table.
+    ///
+    /// Assigns a unique internal name to the declared variable, inserts it
+    /// into the symbol table, and resolves the initializer expression if present.
+    /// Returns an error if the variable is declared more than once.
     fn resolve(declaration: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         if variables.contains_key(&declaration.0) {
             Err(String::from("Duplicate variable declaration"))
@@ -293,6 +368,10 @@ impl Declaration {
     }
 }
 
+/// Represents a statement in the abstract syntax tree.
+///
+/// Statements include expression statements, return statements,
+/// and empty (null) statements.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     NULL,
@@ -301,6 +380,9 @@ pub enum Statement {
 }
 
 impl Statement {
+    /// Resolves identifiers within the statement using the provided symbol table.
+    ///
+    /// Recursively resolves any expressions contained in the statement.
     fn resolve(statement: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         let stmt = match statement {
             Self::EXPRESSION(expr) => Self::EXPRESSION(Expression::resolve(expr, variables)?),
@@ -321,7 +403,9 @@ impl fmt::Display for Statement {
     }
 }
 
-// Represents a block item in the AST.
+/// Represents an item within a block.
+///
+/// A block item may be either a variable declaration or a statement.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlockItem {
     Declaration(Declaration),
@@ -329,6 +413,11 @@ pub enum BlockItem {
 }
 
 impl BlockItem {
+    /// Parses a single block item from the token stream.
+    ///
+    /// Block items include variable declarations, return statements,
+    /// expression statements, and empty statements. Consumes the tokens
+    /// required to form the item and returns an error if the input is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
@@ -380,6 +469,10 @@ impl BlockItem {
         }
     }
 
+    /// Resolves identifiers within the block item using the provided symbol table.
+    ///
+    /// Variable declarations are registered and resolved, and statements
+    /// are recursively resolved.
     fn resolve(item: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match item {
             Self::Declaration(decl) => {
@@ -399,19 +492,29 @@ impl fmt::Display for BlockItem {
     }
 }
 
-/// Represents a function in the AST.
+/// Represents a function definition in the abstract syntax tree.
+///
+/// A function consists of a name and a sequence of block items forming
+/// its body.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function(String, Vec<BlockItem>);
 
 impl Function {
+    /// Returns the function name.
     pub fn name(&self) -> &str {
         &self.0
     }
 
+    /// Returns the sequence of block items that make up the function body.
     pub fn instructions(self) -> Vec<BlockItem> {
         self.1
     }
 
+    /// Parses a function definition from the token stream.
+    ///
+    /// Expects a function signature of the form `int <name>(void)` followed
+    /// by a block body. Consumes all tokens associated with the function and
+    /// returns an error if the definition is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
             Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
@@ -450,6 +553,10 @@ impl Function {
         }
     }
 
+    /// Resolves identifiers within the function body using the provided symbol table.
+    ///
+    /// Recursively resolves all declarations and statements contained in the
+    /// function body.
     fn resolve(function: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         let name = String::from(&function.0);
         let mut items: Vec<BlockItem> = Vec::new();
@@ -477,6 +584,10 @@ impl From<Program> for Function {
     }
 }
 
+/// Represents a complete program.
+///
+/// A program consists of a single top-level function, which serves as
+/// the entry point of the compilation unit.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program(Function);
 
@@ -486,6 +597,11 @@ impl fmt::Display for Program {
     }
 }
 
+/// Parses a complete program from a sequence of tokens.
+///
+/// Expects the input to contain exactly one valid function definition.
+/// Returns an error if parsing fails or if extra tokens remain after
+/// the program is parsed.
 pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
     let mut tokens: VecDeque<tokenizer::Token> = VecDeque::from(tokens);
 
@@ -499,6 +615,10 @@ pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
     }
 }
 
+/// Validates and resolves the program's abstract syntax tree.
+///
+/// Performs identifier resolution and semantic checks, returning a
+/// transformed program with resolved symbols or an error if validation fails.
 pub fn validate(ast: Program) -> Result<Program, String> {
     let main = Function::from(ast);
     let mut vars: HashMap<String, String> = HashMap::new();

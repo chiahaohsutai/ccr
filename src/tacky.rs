@@ -7,17 +7,17 @@ use super::parser;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
-    COMPLEMENT,
-    NEGATE,
-    NOT,
+    Complement,
+    Negation,
+    LogicalNot,
 }
 
 impl From<parser::UnaryOperator> for UnaryOperator {
     fn from(op: parser::UnaryOperator) -> Self {
         match op {
-            parser::UnaryOperator::COMPLEMENT => Self::COMPLEMENT,
-            parser::UnaryOperator::NEGATE => Self::NEGATE,
-            parser::UnaryOperator::NOT => Self::NOT,
+            parser::UnaryOperator::Complement => Self::Complement,
+            parser::UnaryOperator::Negation => Self::Negation,
+            parser::UnaryOperator::LogicalNot => Self::LogicalNot,
         }
     }
 }
@@ -25,9 +25,9 @@ impl From<parser::UnaryOperator> for UnaryOperator {
 impl fmt::Display for UnaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UnaryOperator::COMPLEMENT => write!(f, "~"),
-            UnaryOperator::NEGATE => write!(f, "-"),
-            UnaryOperator::NOT => write!(f, "!"),
+            Self::Complement => write!(f, "~"),
+            Self::Negation => write!(f, "-"),
+            Self::LogicalNot => write!(f, "!"),
         }
     }
 }
@@ -57,22 +57,22 @@ impl TryFrom<parser::BinaryOperator> for BinaryOperator {
 
     fn try_from(op: parser::BinaryOperator) -> Result<Self, String> {
         match op {
-            parser::BinaryOperator::ADD => Ok(Self::ADD),
-            parser::BinaryOperator::SUBTRACT => Ok(Self::SUBTRACT),
-            parser::BinaryOperator::MULTIPLY => Ok(Self::MULTIPLY),
-            parser::BinaryOperator::DIVIDE => Ok(Self::DIVIDE),
-            parser::BinaryOperator::REMAINDER => Ok(Self::REMAINDER),
-            parser::BinaryOperator::BITWISEAND => Ok(Self::BITWISEAND),
-            parser::BinaryOperator::BITWISEOR => Ok(Self::BITWISEOR),
-            parser::BinaryOperator::BITWISEXOR => Ok(Self::BITWISEXOR),
-            parser::BinaryOperator::LEFTSHIFT => Ok(Self::LEFTSHIFT),
-            parser::BinaryOperator::RIGHTSHIFT => Ok(Self::RIGHTSHIFT),
-            parser::BinaryOperator::EQUAL => Ok(Self::EQUAL),
-            parser::BinaryOperator::NOTEQUAL => Ok(Self::NOTEQUAL),
-            parser::BinaryOperator::LESSTHAN => Ok(Self::LESSTHAN),
-            parser::BinaryOperator::GREATERTHAN => Ok(Self::GREATERTHAN),
-            parser::BinaryOperator::LESSEQUAL => Ok(Self::LESSEQUAL),
-            parser::BinaryOperator::GREATEREQUAL => Ok(Self::GREATEREQUAL),
+            parser::BinaryOperator::Add => Ok(Self::ADD),
+            parser::BinaryOperator::Substract => Ok(Self::SUBTRACT),
+            parser::BinaryOperator::Multiply => Ok(Self::MULTIPLY),
+            parser::BinaryOperator::Divide => Ok(Self::DIVIDE),
+            parser::BinaryOperator::Remainder => Ok(Self::REMAINDER),
+            parser::BinaryOperator::BitwiseAnd => Ok(Self::BITWISEAND),
+            parser::BinaryOperator::BitwiseOr => Ok(Self::BITWISEOR),
+            parser::BinaryOperator::BitwiseXor => Ok(Self::BITWISEXOR),
+            parser::BinaryOperator::LeftShift => Ok(Self::LEFTSHIFT),
+            parser::BinaryOperator::RightShift => Ok(Self::RIGHTSHIFT),
+            parser::BinaryOperator::EqualEqual => Ok(Self::EQUAL),
+            parser::BinaryOperator::NotEqual => Ok(Self::NOTEQUAL),
+            parser::BinaryOperator::LessThan => Ok(Self::LESSTHAN),
+            parser::BinaryOperator::GreaterThan => Ok(Self::GREATERTHAN),
+            parser::BinaryOperator::LessThanOrEq => Ok(Self::LESSEQUAL),
+            parser::BinaryOperator::GreaterThanOrEq => Ok(Self::GREATEREQUAL),
             _ => Err(format!("Operator '{:?}' is not a tacky binary op.", op)),
         }
     }
@@ -112,10 +112,10 @@ impl TryFrom<parser::Expression> for Operand {
 
     fn try_from(value: parser::Expression) -> Result<Self, String> {
         match value {
-            parser::Expression::FACTOR(parser::Factor::IDENTIFIER(ident)) => {
+            parser::Expression::FACTOR(parser::Factor::Identifier(ident)) => {
                 Ok(Self::VARIABLE(ident))
             }
-            parser::Expression::FACTOR(parser::Factor::INT(i)) => Ok(Self::CONSTANT(i)),
+            parser::Expression::FACTOR(parser::Factor::Int(i)) => Ok(Self::CONSTANT(i)),
             _ => Err(String::from("Expression is not an operand")),
         }
     }
@@ -162,18 +162,18 @@ fn generate_instructions(
 ) -> Result<Operand, String> {
     match expression {
         parser::Expression::FACTOR(factor) => match factor {
-            parser::Factor::INT(n) => Ok(Operand::CONSTANT(n)),
-            parser::Factor::UNARY(op, exp) => {
+            parser::Factor::Int(n) => Ok(Operand::CONSTANT(n)),
+            parser::Factor::Unary(op, exp) => {
                 let src = generate_instructions(parser::Expression::FACTOR(*exp), instructions)?;
                 let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
                 let op = UnaryOperator::from(op);
                 instructions.push(Instruction::UNARY(op, src, dst.clone()));
                 Ok(dst)
             }
-            parser::Factor::EXPRESSION(expr) => generate_instructions(*expr, instructions),
-            parser::Factor::IDENTIFIER(ident) => Ok(Operand::VARIABLE(ident)),
+            parser::Factor::Expression(expr) => generate_instructions(*expr, instructions),
+            parser::Factor::Identifier(ident) => Ok(Operand::VARIABLE(ident)),
         },
-        parser::Expression::BINARY(lhs, parser::BinaryOperator::ASSIGNMENT, rhs) => {
+        parser::Expression::BINARY(lhs, parser::BinaryOperator::Assignment, rhs) => {
             let rhs = generate_instructions(*rhs, instructions)?;
             let lhs = Operand::try_from(*lhs)?;
             instructions.push(Instruction::COPY(rhs, lhs.clone()));
@@ -182,14 +182,14 @@ fn generate_instructions(
         parser::Expression::BINARY(lhs, op, rhs) => {
             let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
 
-            if let parser::BinaryOperator::AND | parser::BinaryOperator::OR = op {
+            if let parser::BinaryOperator::LogicalAnd | parser::BinaryOperator::LogicalOr = op {
                 let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
                 let lhs = generate_instructions(*lhs, instructions)?;
 
                 let mut rhs_instructions: Vec<Instruction> = Vec::new();
                 let rhs = generate_instructions(*rhs, &mut rhs_instructions)?;
 
-                if matches!(op, parser::BinaryOperator::AND) {
+                if matches!(op, parser::BinaryOperator::LogicalAnd) {
                     let isfalse = format!("label.{}", nanoid!(21, ALPHANUMERIC));
                     instructions.push(Instruction::JUMPIF(lhs, String::from(&isfalse)));
                     instructions.extend(rhs_instructions);

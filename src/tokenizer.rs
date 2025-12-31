@@ -3,6 +3,10 @@ use std::{cmp, fmt, sync};
 
 use regex::Regex;
 
+/// Represents all supported operators in the language.
+///
+/// This enum includes arithmetic, logical, bitwise, comparison, shift,
+/// and assignment operators as they appear in source code.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Operator {
     Decrement,
@@ -24,14 +28,19 @@ pub enum Operator {
     NotEqual,
     LessThan,
     GreaterThan,
-    LessThanOrEqual,
-    GreaterThanOrEqual,
+    LessThanOrEq,
+    GreaterThanOrEq,
     Assignment,
     AddAssignment,
     SubAssignment,
     DivAssignment,
     ProdAssignment,
     RemAssignment,
+    AndAssignment,
+    OrAssignment,
+    XorAssignment,
+    LShiftAssignment,
+    RShiftAssignment,
 }
 
 impl Operator {
@@ -47,8 +56,8 @@ impl Operator {
     /// a recognized operator.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let pattern = r"^(<<=|>>=|\+=|-=|\*=|%=|&=|\|=|<=|>=|--|<<|>>|&&|\|\||==|!=|[\-~\+\*\/%&\|\^!><=])";
-            Regex::new(pattern).unwrap()
+            let p = r"^(<<=|>>=|\+=|-=|/=|\*=|%=|&=|\|=|\^=|<=|>=|--|<<|>>|&&|\|\||==|!=|[\-~\+\*\/%&\|\^!><=])";
+            Regex::new(p).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
     }
@@ -80,17 +89,20 @@ impl Operator {
             | Self::SubAssignment
             | Self::DivAssignment
             | Self::AddAssignment
-            | Self::RemAssignment => 1,
+            | Self::RemAssignment
+            | Self::ProdAssignment
+            | Self::AndAssignment
+            | Self::OrAssignment
+            | Self::XorAssignment
+            | Self::LShiftAssignment
+            | Self::RShiftAssignment => 1,
             Self::LogicalOr => 5,
             Self::LogicalAnd => 10,
             Self::BitwiseOr => 15,
             Self::BitwiseXor => 20,
             Self::BitwiseAnd => 25,
             Self::EqualEqual | Self::NotEqual => 30,
-            Self::LessThan
-            | Self::GreaterThan
-            | Self::LessThanOrEqual
-            | Self::GreaterThanOrEqual => 35,
+            Self::LessThan | Self::GreaterThan | Self::LessThanOrEq | Self::GreaterThanOrEq => 35,
             Self::RightShift | Self::LeftShift => 40,
             Self::Addition | Self::Negation => 45,
             Self::Product | Self::Division | Self::Remainder => 50,
@@ -121,14 +133,19 @@ impl AsRef<str> for Operator {
             Self::NotEqual => "!=",
             Self::LessThan => "<",
             Self::GreaterThan => ">",
-            Self::LessThanOrEqual => "<=",
-            Self::GreaterThanOrEqual => ">=",
+            Self::LessThanOrEq => "<=",
+            Self::GreaterThanOrEq => ">=",
             Self::Assignment => "=",
             Self::AddAssignment => "+=",
             Self::SubAssignment => "-=",
             Self::DivAssignment => "/=",
             Self::ProdAssignment => "*=",
             Self::RemAssignment => "%=",
+            Self::AndAssignment => "&=",
+            Self::OrAssignment => "|=",
+            Self::XorAssignment => "^=",
+            Self::LShiftAssignment => "<<=",
+            Self::RShiftAssignment => ">>=",
         }
     }
 }
@@ -157,14 +174,19 @@ impl FromStr for Operator {
             "!=" => Ok(Self::NotEqual),
             "<" => Ok(Self::LessThan),
             ">" => Ok(Self::GreaterThan),
-            "<=" => Ok(Self::LessThanOrEqual),
-            ">=" => Ok(Self::GreaterThanOrEqual),
+            "<=" => Ok(Self::LessThanOrEq),
+            ">=" => Ok(Self::GreaterThanOrEq),
             "=" => Ok(Self::Assignment),
             "+=" => Ok(Self::AddAssignment),
             "-=" => Ok(Self::SubAssignment),
             "*=" => Ok(Self::ProdAssignment),
             "/=" => Ok(Self::DivAssignment),
             "%=" => Ok(Self::RemAssignment),
+            "&=" => Ok(Self::AndAssignment),
+            "|=" => Ok(Self::OrAssignment),
+            "^=" => Ok(Self::XorAssignment),
+            ">>=" => Ok(Self::RShiftAssignment),
+            "<<=" => Ok(Self::LShiftAssignment),
             _ => Err(format!("Unknown operator: {}", s)),
         }
     }
@@ -176,6 +198,7 @@ impl fmt::Display for Operator {
     }
 }
 
+/// Represents reserved keywords in the language.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Keyword {
     Int,
@@ -231,6 +254,7 @@ impl fmt::Display for Keyword {
     }
 }
 
+/// Represents single-character delimiter tokens used for grouping and separation.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Delimiter {
     LeftParen,
@@ -292,6 +316,10 @@ impl fmt::Display for Delimiter {
     }
 }
 
+/// Represents a lexical token produced by the tokenizer.
+///
+/// A token corresponds to the smallest meaningful unit in the source code
+/// and is later consumed by the parser to construct higher-level syntax.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Constant(u64),
@@ -345,8 +373,8 @@ impl Token {
             .map(|kw| Token::Keyword(kw))
             .or_else(|| Self::match_identifier(input))
             .or_else(|| Self::match_constant(input))
-            .or_else(|| Delimiter::find_match(input).map(|delim| Token::Delimiter(delim)))
             .or_else(|| Operator::find_match(input).map(|op| Token::Operator(op)))
+            .or_else(|| Delimiter::find_match(input).map(|delim| Token::Delimiter(delim)))
     }
 
     /// Attempts to match an identifier at the start of the input string.
