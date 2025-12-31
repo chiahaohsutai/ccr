@@ -82,6 +82,26 @@ pub enum BinaryOperator {
     RShiftAssignment,
 }
 
+impl BinaryOperator {
+    // Returns `true` if this operator is an assignment or compound assignment operator.
+    pub fn is_assignment(&self) -> bool {
+        matches!(
+            self,
+            Self::AddAssignment
+                | Self::SubAssignment
+                | Self::DivAssignment
+                | Self::ProdAssignment
+                | Self::RemAssignment
+                | Self::AndAssignment
+                | Self::OrAssignment
+                | Self::XorAssignment
+                | Self::LShiftAssignment
+                | Self::RShiftAssignment
+                | Self::Assignment
+        )
+    }
+}
+
 impl TryFrom<tokenizer::Operator> for BinaryOperator {
     type Error = String;
 
@@ -255,15 +275,15 @@ impl fmt::Display for Factor {
 /// of two subexpressions and a binary operator.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
-    FACTOR(Factor),
-    BINARY(Box<Expression>, BinaryOperator, Box<Expression>),
+    Factor(Factor),
+    Binary(Box<Expression>, BinaryOperator, Box<Expression>),
 }
 
 impl Expression {
     /// Returns `true` if this expression resolves to an identifier.
     fn is_identifier(&self) -> bool {
         match self {
-            Self::FACTOR(f) if f.is_identifier() => true,
+            Self::Factor(f) if f.is_identifier() => true,
             _ => false,
         }
     }
@@ -274,7 +294,7 @@ impl Expression {
     /// according to their precedence. Tokens are consumed from the front of
     /// the stream. Returns an error if the expression is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>, precedence: u64) -> Result<Self, String> {
-        let mut lhs = Expression::FACTOR(Factor::parse(tokens)?);
+        let mut lhs = Expression::Factor(Factor::parse(tokens)?);
 
         while tokens
             .front()
@@ -283,13 +303,17 @@ impl Expression {
             let token = tokens.pop_front().unwrap();
             let precedence = token.precedence();
 
-            if let tokenizer::Token::Operator(tokenizer::Operator::Assignment) = token {
-                let rhs = Expression::parse(tokens, precedence)?;
-                lhs = Self::BINARY(Box::new(lhs), BinaryOperator::Assignment, Box::new(rhs));
-            } else {
-                let rhs = Expression::parse(tokens, precedence + 1)?;
-                let op = BinaryOperator::try_from(token).unwrap();
-                lhs = Expression::BINARY(Box::new(lhs), op, Box::new(rhs));
+            match token {
+                tokenizer::Token::Operator(op) if token.is_assignment_operator() => {
+                    let rhs = Expression::parse(tokens, precedence)?;
+                    let op = BinaryOperator::try_from(op)?;
+                    lhs = Self::Binary(Box::new(lhs), op, Box::new(rhs));
+                }
+                _ => {
+                    let rhs = Expression::parse(tokens, precedence + 1)?;
+                    let op = BinaryOperator::try_from(token).unwrap();
+                    lhs = Expression::Binary(Box::new(lhs), op, Box::new(rhs));
+                }
             }
         }
         Ok(lhs)
@@ -304,17 +328,16 @@ impl Expression {
     /// an identifier cannot be resolved.
     fn resolve(expression: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match expression {
-            Self::FACTOR(factor) => Ok(Self::FACTOR(Factor::resolve(factor, variables)?)),
-            Self::BINARY(lhs, op, rhs) => match op {
-                BinaryOperator::Assignment if !lhs.is_identifier() => {
-                    Err(String::from("Invalid lvalue in assignment"))
-                }
-                _ => {
+            Self::Factor(factor) => Ok(Self::Factor(Factor::resolve(factor, variables)?)),
+            Self::Binary(lhs, op, rhs) => {
+                if op.is_assignment() && !lhs.is_identifier() {
+                    Err(format!("Invalid lvalue in assignment: {lhs}"))
+                } else {
                     let lhs = Box::new(Expression::resolve(*lhs, variables)?);
                     let rhs = Box::new(Expression::resolve(*rhs, variables)?);
-                    Ok(Expression::BINARY(lhs, op, rhs))
+                    Ok(Expression::Binary(lhs, op, rhs))
                 }
-            },
+            }
         }
     }
 }
@@ -322,8 +345,8 @@ impl Expression {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::FACTOR(fac) => write!(f, "{fac}"),
-            Self::BINARY(l, op, r) => write!(f, "{l} {op} {r}"),
+            Self::Factor(fac) => write!(f, "{fac}"),
+            Self::Binary(l, op, r) => write!(f, "{l} {op} {r}"),
         }
     }
 }
@@ -374,9 +397,9 @@ impl Declaration {
 /// and empty (null) statements.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
-    NULL,
-    RETURN(Expression),
-    EXPRESSION(Expression),
+    Null,
+    Return(Expression),
+    Expression(Expression),
 }
 
 impl Statement {
@@ -385,9 +408,9 @@ impl Statement {
     /// Recursively resolves any expressions contained in the statement.
     fn resolve(statement: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         let stmt = match statement {
-            Self::EXPRESSION(expr) => Self::EXPRESSION(Expression::resolve(expr, variables)?),
-            Self::RETURN(expr) => Self::RETURN(Expression::resolve(expr, variables)?),
-            Self::NULL => Self::NULL,
+            Self::Expression(expr) => Self::Expression(Expression::resolve(expr, variables)?),
+            Self::Return(expr) => Self::Return(Expression::resolve(expr, variables)?),
+            Self::Null => Self::Null,
         };
         Ok(stmt)
     }
@@ -396,9 +419,9 @@ impl Statement {
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::NULL => write!(f, ";"),
-            Self::EXPRESSION(expr) => write!(f, "{};", expr),
-            Self::RETURN(expr) => write!(f, "RETURN {};", expr),
+            Self::Null => write!(f, ";"),
+            Self::Expression(expr) => write!(f, "{};", expr),
+            Self::Return(expr) => write!(f, "Return {};", expr),
         }
     }
 }
@@ -421,7 +444,7 @@ impl BlockItem {
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                Ok(Self::Statement(Statement::NULL))
+                Ok(Self::Statement(Statement::Null))
             }
             Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
                 let name = match tokens.pop_front() {
@@ -449,7 +472,7 @@ impl BlockItem {
                 let expr = Expression::parse(tokens, 0)?;
                 let stmt = match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(Statement::RETURN(expr))
+                        Ok(Statement::Return(expr))
                     }
                     _ => Err(String::from("Expected ';' after return expression.")),
                 };
@@ -460,7 +483,7 @@ impl BlockItem {
                 let expr = Expression::parse(tokens, 0)?;
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(BlockItem::Statement(Statement::EXPRESSION(expr)))
+                        Ok(BlockItem::Statement(Statement::Expression(expr)))
                     }
                     _ => Err(String::from("Expected ';' after expression statement.")),
                 }

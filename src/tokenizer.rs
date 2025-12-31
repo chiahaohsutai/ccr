@@ -79,6 +79,24 @@ impl Operator {
         !self.is_unary()
     }
 
+    /// Returns `true` if this operator is a assignment or compound assignment operator
+    fn is_assignment(&self) -> bool {
+        matches!(
+            self,
+            Self::Assignment
+                | Self::AddAssignment
+                | Self::SubAssignment
+                | Self::DivAssignment
+                | Self::RemAssignment
+                | Self::ProdAssignment
+                | Self::AndAssignment
+                | Self::OrAssignment
+                | Self::XorAssignment
+                | Self::RShiftAssignment
+                | Self::LShiftAssignment
+        )
+    }
+
     /// Returns the precedence level of this operator.
     ///
     /// Higher values indicate higher precedence. Operators that do not participate
@@ -335,7 +353,17 @@ impl Token {
     /// Non-operator tokens and unary operators return `false`.
     pub fn is_binary_operator(&self) -> bool {
         match self {
-            Token::Operator(op) => op.is_binary(),
+            Self::Operator(op) => op.is_binary(),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this token represents a assignment or compound assignment operator.
+    ///
+    /// Non-operator tokens return `false`.
+    pub fn is_assignment_operator(&self) -> bool {
+        match self {
+            Self::Operator(op) => op.is_assignment(),
             _ => false,
         }
     }
@@ -346,7 +374,7 @@ impl Token {
     /// Non-operator tokens have a precedence of `0`.
     pub fn precedence(&self) -> u64 {
         match self {
-            Token::Operator(op) => op.precedence(),
+            Self::Operator(op) => op.precedence(),
             _ => 0,
         }
     }
@@ -370,7 +398,7 @@ impl Token {
     /// or `None` if no valid token is found.
     fn match_token(input: &str) -> Option<Self> {
         Keyword::find_match(input)
-            .map(|kw| Token::Keyword(kw))
+            .map(|kw| Self::Keyword(kw))
             .or_else(|| Self::match_identifier(input))
             .or_else(|| Self::match_constant(input))
             .or_else(|| Operator::find_match(input).map(|op| Token::Operator(op)))
@@ -408,11 +436,11 @@ impl Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Token::Constant(value) => write!(f, "{}", value),
-            Token::Keyword(kw) => write!(f, "{}", kw),
-            Token::Identifier(name) => write!(f, "{}", name),
-            Token::Operator(op) => write!(f, "{}", op),
-            Token::Delimiter(delim) => write!(f, "{}", delim),
+            Self::Constant(value) => write!(f, "{}", value),
+            Self::Keyword(kw) => write!(f, "{}", kw),
+            Self::Identifier(name) => write!(f, "{}", name),
+            Self::Operator(op) => write!(f, "{}", op),
+            Self::Delimiter(delim) => write!(f, "{}", delim),
         }
     }
 }

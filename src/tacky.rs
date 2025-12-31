@@ -3,8 +3,11 @@ use nanoid_dictionary::ALPHANUMERIC;
 
 use std::fmt;
 
+use crate::parser::Expression;
+
 use super::parser;
 
+/// Represents unary operators that operate on a single operand.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
     Complement,
@@ -32,24 +35,25 @@ impl fmt::Display for UnaryOperator {
     }
 }
 
+/// Represents binary operators that operate on two operands.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BinaryOperator {
-    ADD,
-    SUBTRACT,
-    MULTIPLY,
-    DIVIDE,
-    REMAINDER,
-    BITWISEAND,
-    BITWISEOR,
-    BITWISEXOR,
-    LEFTSHIFT,
-    RIGHTSHIFT,
-    EQUAL,
-    NOTEQUAL,
-    LESSTHAN,
-    GREATERTHAN,
-    LESSEQUAL,
-    GREATEREQUAL,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Remainder,
+    BitwiseAnd,
+    BitwiseOr,
+    BitwiseXor,
+    LeftShift,
+    RightShift,
+    EqualEqual,
+    NotEqual,
+    LessThan,
+    GreaterThan,
+    LessThanOrEq,
+    GreaterThanOrEq,
 }
 
 impl TryFrom<parser::BinaryOperator> for BinaryOperator {
@@ -57,22 +61,22 @@ impl TryFrom<parser::BinaryOperator> for BinaryOperator {
 
     fn try_from(op: parser::BinaryOperator) -> Result<Self, String> {
         match op {
-            parser::BinaryOperator::Add => Ok(Self::ADD),
-            parser::BinaryOperator::Substract => Ok(Self::SUBTRACT),
-            parser::BinaryOperator::Multiply => Ok(Self::MULTIPLY),
-            parser::BinaryOperator::Divide => Ok(Self::DIVIDE),
-            parser::BinaryOperator::Remainder => Ok(Self::REMAINDER),
-            parser::BinaryOperator::BitwiseAnd => Ok(Self::BITWISEAND),
-            parser::BinaryOperator::BitwiseOr => Ok(Self::BITWISEOR),
-            parser::BinaryOperator::BitwiseXor => Ok(Self::BITWISEXOR),
-            parser::BinaryOperator::LeftShift => Ok(Self::LEFTSHIFT),
-            parser::BinaryOperator::RightShift => Ok(Self::RIGHTSHIFT),
-            parser::BinaryOperator::EqualEqual => Ok(Self::EQUAL),
-            parser::BinaryOperator::NotEqual => Ok(Self::NOTEQUAL),
-            parser::BinaryOperator::LessThan => Ok(Self::LESSTHAN),
-            parser::BinaryOperator::GreaterThan => Ok(Self::GREATERTHAN),
-            parser::BinaryOperator::LessThanOrEq => Ok(Self::LESSEQUAL),
-            parser::BinaryOperator::GreaterThanOrEq => Ok(Self::GREATEREQUAL),
+            parser::BinaryOperator::Add => Ok(Self::Add),
+            parser::BinaryOperator::Substract => Ok(Self::Subtract),
+            parser::BinaryOperator::Multiply => Ok(Self::Multiply),
+            parser::BinaryOperator::Divide => Ok(Self::Divide),
+            parser::BinaryOperator::Remainder => Ok(Self::Remainder),
+            parser::BinaryOperator::BitwiseAnd => Ok(Self::BitwiseAnd),
+            parser::BinaryOperator::BitwiseOr => Ok(Self::BitwiseOr),
+            parser::BinaryOperator::BitwiseXor => Ok(Self::BitwiseXor),
+            parser::BinaryOperator::LeftShift => Ok(Self::LeftShift),
+            parser::BinaryOperator::RightShift => Ok(Self::RightShift),
+            parser::BinaryOperator::EqualEqual => Ok(Self::EqualEqual),
+            parser::BinaryOperator::NotEqual => Ok(Self::NotEqual),
+            parser::BinaryOperator::LessThan => Ok(Self::LessThan),
+            parser::BinaryOperator::GreaterThan => Ok(Self::GreaterThan),
+            parser::BinaryOperator::LessThanOrEq => Ok(Self::LessThanOrEq),
+            parser::BinaryOperator::GreaterThanOrEq => Ok(Self::GreaterThanOrEq),
             _ => Err(format!("Operator '{:?}' is not a tacky binary op.", op)),
         }
     }
@@ -81,30 +85,33 @@ impl TryFrom<parser::BinaryOperator> for BinaryOperator {
 impl fmt::Display for BinaryOperator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BinaryOperator::ADD => write!(f, "+"),
-            BinaryOperator::SUBTRACT => write!(f, "-"),
-            BinaryOperator::MULTIPLY => write!(f, "*"),
-            BinaryOperator::DIVIDE => write!(f, "/"),
-            BinaryOperator::REMAINDER => write!(f, "%"),
-            BinaryOperator::BITWISEAND => write!(f, "&"),
-            BinaryOperator::BITWISEOR => write!(f, "|"),
-            BinaryOperator::BITWISEXOR => write!(f, "^"),
-            BinaryOperator::LEFTSHIFT => write!(f, "<<"),
-            BinaryOperator::RIGHTSHIFT => write!(f, ">>"),
-            BinaryOperator::EQUAL => write!(f, "=="),
-            BinaryOperator::NOTEQUAL => write!(f, "!="),
-            BinaryOperator::LESSTHAN => write!(f, "<"),
-            BinaryOperator::GREATERTHAN => write!(f, ">"),
-            BinaryOperator::LESSEQUAL => write!(f, "<="),
-            BinaryOperator::GREATEREQUAL => write!(f, ">="),
+            Self::Add => write!(f, "+"),
+            Self::Subtract => write!(f, "-"),
+            Self::Multiply => write!(f, "*"),
+            Self::Divide => write!(f, "/"),
+            Self::Remainder => write!(f, "%"),
+            Self::BitwiseAnd => write!(f, "&"),
+            Self::BitwiseOr => write!(f, "|"),
+            Self::BitwiseXor => write!(f, "^"),
+            Self::LeftShift => write!(f, "<<"),
+            Self::RightShift => write!(f, ">>"),
+            Self::EqualEqual => write!(f, "=="),
+            Self::NotEqual => write!(f, "!="),
+            Self::LessThan => write!(f, "<"),
+            Self::GreaterThan => write!(f, ">"),
+            Self::LessThanOrEq => write!(f, "<="),
+            Self::GreaterThanOrEq => write!(f, ">="),
         }
     }
 }
 
+/// Represents an operand in an expression.
+///
+/// An operand may be a constant literal or a variable reference.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operand {
-    CONSTANT(u64),
-    VARIABLE(String),
+    Constant(u64),
+    Variable(String),
 }
 
 impl TryFrom<parser::Expression> for Operand {
@@ -112,10 +119,10 @@ impl TryFrom<parser::Expression> for Operand {
 
     fn try_from(value: parser::Expression) -> Result<Self, String> {
         match value {
-            parser::Expression::FACTOR(parser::Factor::Identifier(ident)) => {
-                Ok(Self::VARIABLE(ident))
+            parser::Expression::Factor(parser::Factor::Identifier(ident)) => {
+                Ok(Self::Variable(ident))
             }
-            parser::Expression::FACTOR(parser::Factor::Int(i)) => Ok(Self::CONSTANT(i)),
+            parser::Expression::Factor(parser::Factor::Int(i)) => Ok(Self::Constant(i)),
             _ => Err(String::from("Expression is not an operand")),
         }
     }
@@ -124,65 +131,65 @@ impl TryFrom<parser::Expression> for Operand {
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Operand::CONSTANT(c) => write!(f, "{}", c),
-            Operand::VARIABLE(v) => write!(f, "{}", v),
+            Self::Constant(c) => write!(f, "{}", c),
+            Self::Variable(v) => write!(f, "{}", v),
         }
     }
 }
 
+/// Represents a low-level instruction in the intermediate representation.
+///
+/// Instructions operate on operands and model control flow, data movement,
+/// and arithmetic or logical operations after semantic analysis.
 pub enum Instruction {
-    RETURN(Operand),
-    UNARY(UnaryOperator, Operand, Operand),
-    BINARY(BinaryOperator, Operand, Operand, Operand),
-    COPY(Operand, Operand),
-    JUMP(String),
-    JUMPIF(Operand, String),
-    JUMPIFNOT(Operand, String),
-    LABEL(String),
+    Return(Operand),
+    Unary(UnaryOperator, Operand, Operand),
+    Binary(BinaryOperator, Operand, Operand, Operand),
+    Copy(Operand, Operand),
+    Jump(String),
+    JumpIfZero(Operand, String),
+    JumpIfNotZero(Operand, String),
+    Label(String),
 }
 
 impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Instruction::RETURN(v) => write!(f, "RETURN {}", v),
-            Instruction::UNARY(op, src, dest) => write!(f, "{} {} {}", op, src, dest),
-            Instruction::BINARY(op, l, r, dest) => write!(f, "{} {} {} {}", op, l, r, dest),
-            Instruction::COPY(src, dest) => write!(f, "COPY {} {}", src, dest),
-            Instruction::JUMP(label) => write!(f, "JUMP {}", label),
-            Instruction::JUMPIF(cond, label) => write!(f, "JUMP IF ZERO {} {}", cond, label),
-            Instruction::JUMPIFNOT(cond, label) => write!(f, "JUMP IF NOT ZERO {} {}", cond, label),
-            Instruction::LABEL(label) => write!(f, "LABEL {}", label),
+            Instruction::Return(v) => write!(f, "Return {}", v),
+            Instruction::Unary(op, src, dest) => write!(f, "{} {} {}", op, src, dest),
+            Instruction::Binary(op, l, r, dest) => write!(f, "{} {} {} {}", op, l, r, dest),
+            Instruction::Copy(src, dest) => write!(f, "Copy {} {}", src, dest),
+            Instruction::Jump(label) => write!(f, "Jump {}", label),
+            Instruction::JumpIfZero(cond, label) => write!(f, "Jump If Zero {} {}", cond, label),
+            Instruction::JumpIfNotZero(cond, label) => {
+                write!(f, "Jump If Not Zero {} {}", cond, label)
+            }
+            Instruction::Label(label) => write!(f, "Label {}", label),
         }
     }
 }
 
-fn generate_instructions(
+/// Generates intermediate instructions for a binary expression.
+///
+/// Lowers a binary expression AST node into IR instructions, appending them
+/// to `instructions`, and returns the operand containing the result. Handles
+/// assignments, compound assignments, and preserves short-circuit semantics
+/// for logical operators.
+fn generate_binary_expression_instructions(
     expression: parser::Expression,
     instructions: &mut Vec<Instruction>,
 ) -> Result<Operand, String> {
     match expression {
-        parser::Expression::FACTOR(factor) => match factor {
-            parser::Factor::Int(n) => Ok(Operand::CONSTANT(n)),
-            parser::Factor::Unary(op, exp) => {
-                let src = generate_instructions(parser::Expression::FACTOR(*exp), instructions)?;
-                let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
-                let op = UnaryOperator::from(op);
-                instructions.push(Instruction::UNARY(op, src, dst.clone()));
-                Ok(dst)
+        Expression::Binary(lhs, op, rhs) => match op {
+            parser::BinaryOperator::Assignment => {
+                let rhs = generate_instructions(*rhs, instructions)?;
+                let lhs = Operand::try_from(*lhs)?;
+                instructions.push(Instruction::Copy(rhs, lhs.clone()));
+                Ok(lhs)
             }
-            parser::Factor::Expression(expr) => generate_instructions(*expr, instructions),
-            parser::Factor::Identifier(ident) => Ok(Operand::VARIABLE(ident)),
-        },
-        parser::Expression::BINARY(lhs, parser::BinaryOperator::Assignment, rhs) => {
-            let rhs = generate_instructions(*rhs, instructions)?;
-            let lhs = Operand::try_from(*lhs)?;
-            instructions.push(Instruction::COPY(rhs, lhs.clone()));
-            Ok(lhs)
-        }
-        parser::Expression::BINARY(lhs, op, rhs) => {
-            let dst = Operand::VARIABLE(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
+            parser::BinaryOperator::LogicalAnd | parser::BinaryOperator::LogicalOr => {
+                let dst = Operand::Variable(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
 
-            if let parser::BinaryOperator::LogicalAnd | parser::BinaryOperator::LogicalOr = op {
                 let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
                 let lhs = generate_instructions(*lhs, instructions)?;
 
@@ -191,34 +198,88 @@ fn generate_instructions(
 
                 if matches!(op, parser::BinaryOperator::LogicalAnd) {
                     let isfalse = format!("label.{}", nanoid!(21, ALPHANUMERIC));
-                    instructions.push(Instruction::JUMPIF(lhs, String::from(&isfalse)));
+                    instructions.push(Instruction::JumpIfZero(lhs, String::from(&isfalse)));
                     instructions.extend(rhs_instructions);
-                    instructions.push(Instruction::JUMPIF(rhs, String::from(&isfalse)));
-                    instructions.push(Instruction::COPY(Operand::CONSTANT(1), dst.clone()));
-                    instructions.push(Instruction::JUMP(end.clone()));
-                    instructions.push(Instruction::LABEL(isfalse));
-                    instructions.push(Instruction::COPY(Operand::CONSTANT(0), dst.clone()));
-                    instructions.push(Instruction::LABEL(end));
+                    instructions.push(Instruction::JumpIfZero(rhs, String::from(&isfalse)));
+                    instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
+                    instructions.push(Instruction::Jump(end.clone()));
+                    instructions.push(Instruction::Label(isfalse));
+                    instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
+                    instructions.push(Instruction::Label(end));
                 } else {
                     let istrue = format!("label.{}", nanoid!(21, ALPHANUMERIC));
-                    instructions.push(Instruction::JUMPIFNOT(lhs, String::from(&istrue)));
+                    instructions.push(Instruction::JumpIfNotZero(lhs, String::from(&istrue)));
                     instructions.extend(rhs_instructions);
-                    instructions.push(Instruction::JUMPIFNOT(rhs, String::from(&istrue)));
-                    instructions.push(Instruction::COPY(Operand::CONSTANT(0), dst.clone()));
-                    instructions.push(Instruction::JUMP(end.clone()));
-                    instructions.push(Instruction::LABEL(istrue));
-                    instructions.push(Instruction::COPY(Operand::CONSTANT(1), dst.clone()));
-                    instructions.push(Instruction::LABEL(end));
+                    instructions.push(Instruction::JumpIfNotZero(rhs, String::from(&istrue)));
+                    instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
+                    instructions.push(Instruction::Jump(end.clone()));
+                    instructions.push(Instruction::Label(istrue));
+                    instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
+                    instructions.push(Instruction::Label(end));
                 }
                 Ok(dst)
-            } else {
+            }
+            op if op.is_assignment() => {
+                let rhs = generate_instructions(*rhs, instructions)?;
+                let op = match op {
+                    parser::BinaryOperator::AddAssignment => Ok(BinaryOperator::Add),
+                    parser::BinaryOperator::SubAssignment => Ok(BinaryOperator::Subtract),
+                    parser::BinaryOperator::DivAssignment => Ok(BinaryOperator::Divide),
+                    parser::BinaryOperator::RemAssignment => Ok(BinaryOperator::Remainder),
+                    parser::BinaryOperator::ProdAssignment => Ok(BinaryOperator::Multiply),
+                    parser::BinaryOperator::AndAssignment => Ok(BinaryOperator::BitwiseAnd),
+                    parser::BinaryOperator::OrAssignment => Ok(BinaryOperator::BitwiseOr),
+                    parser::BinaryOperator::XorAssignment => Ok(BinaryOperator::BitwiseXor),
+                    parser::BinaryOperator::LShiftAssignment => Ok(BinaryOperator::LeftShift),
+                    parser::BinaryOperator::RShiftAssignment => Ok(BinaryOperator::RightShift),
+                    _ => Err(format!("Expected compound asssignment op, found: {op}")),
+                }?;
+                let temp = Operand::Variable(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
+                let lhs = generate_instructions(*lhs, instructions)?;
+                instructions.push(Instruction::Binary(op, lhs.clone(), rhs, temp.clone()));
+                instructions.push(Instruction::Copy(temp, lhs.clone()));
+                Ok(lhs)
+            }
+            op => {
+                let dst = Operand::Variable(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
                 let lhs = generate_instructions(*lhs, instructions)?;
                 let rhs = generate_instructions(*rhs, instructions)?;
                 let op = BinaryOperator::try_from(op).unwrap();
-                instructions.push(Instruction::BINARY(op, lhs, rhs, dst.clone()));
+                instructions.push(Instruction::Binary(op, lhs, rhs, dst.clone()));
                 Ok(dst)
             }
+        },
+        _ => Err(format!("Expected binary expression, found: {}", expression)),
+    }
+}
+
+/// Generates intermediate instructions for the given expression.
+///
+/// Recursively lowers an expression AST into a sequence of IR instructions,
+/// appending them to `instructions`. Returns the operand that holds the
+/// expression’s resulting value.
+///
+/// Temporary variables are introduced as needed, and short-circuit semantics
+/// are preserved for logical operators.
+fn generate_instructions(
+    expression: parser::Expression,
+    instructions: &mut Vec<Instruction>,
+) -> Result<Operand, String> {
+    if let parser::Expression::Factor(factor) = expression {
+        match factor {
+            parser::Factor::Int(n) => Ok(Operand::Constant(n)),
+            parser::Factor::Unary(op, exp) => {
+                let src = generate_instructions(parser::Expression::Factor(*exp), instructions)?;
+                let dst = Operand::Variable(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
+                let op = UnaryOperator::from(op);
+                instructions.push(Instruction::Unary(op, src, dst.clone()));
+                Ok(dst)
+            }
+            parser::Factor::Expression(expr) => generate_instructions(*expr, instructions),
+            parser::Factor::Identifier(ident) => Ok(Operand::Variable(ident)),
         }
+    } else {
+        generate_binary_expression_instructions(expression, instructions)
     }
 }
 
@@ -260,25 +321,25 @@ impl TryFrom<parser::Function> for Function {
                     let name = String::from(decl.name());
                     if let Some(expr) = decl.initializer() {
                         let opr = generate_instructions(expr, &mut instructions)?;
-                        let dst = Operand::VARIABLE(name);
-                        instructions.push(Instruction::COPY(opr, dst));
+                        let dst = Operand::Variable(name);
+                        instructions.push(Instruction::Copy(opr, dst));
                     }
                 }
                 parser::BlockItem::Statement(stmt) => match stmt {
-                    parser::Statement::EXPRESSION(expr) => {
+                    parser::Statement::Expression(expr) => {
                         let _ = generate_instructions(expr, &mut instructions)?;
                     }
-                    parser::Statement::RETURN(expr) => {
+                    parser::Statement::Return(expr) => {
                         let res = generate_instructions(expr, &mut instructions)?;
-                        instructions.push(Instruction::RETURN(res));
+                        instructions.push(Instruction::Return(res));
                     }
-                    parser::Statement::NULL => (),
+                    parser::Statement::Null => (),
                 },
             };
         }
         match instructions.last() {
-            Some(Instruction::RETURN(_)) => (),
-            _ => instructions.push(Instruction::RETURN(Operand::CONSTANT(0))),
+            Some(Instruction::Return(_)) => (),
+            _ => instructions.push(Instruction::Return(Operand::Constant(0))),
         };
         Ok(Function(name, instructions))
     }
