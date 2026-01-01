@@ -10,6 +10,7 @@ use regex::Regex;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Operator {
     Decrement,
+    Increment,
     Negation,
     Complement,
     Addition,
@@ -56,7 +57,7 @@ impl Operator {
     /// a recognized operator.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let p = r"^(<<=|>>=|\+=|-=|/=|\*=|%=|&=|\|=|\^=|<=|>=|--|<<|>>|&&|\|\||==|!=|[\-~\+\*\/%&\|\^!><=])";
+            let p = r"^(<<=|>>=|\+=|-=|/=|\*=|%=|&=|\|=|\^=|<=|>=|--|\+\+|<<|>>|&&|\|\||==|!=|[\-~\+\*\/%&\|\^!><=])";
             Regex::new(p).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
@@ -67,7 +68,7 @@ impl Operator {
     /// Unary operators operate on a single operand.
     fn is_unary(&self) -> bool {
         match self {
-            Self::Decrement | Self::Complement | Self::LogicalNot => true,
+            Self::Decrement | Self::Complement | Self::LogicalNot | Self::Increment => true,
             _ => false,
         }
     }
@@ -133,6 +134,7 @@ impl AsRef<str> for Operator {
     fn as_ref(&self) -> &str {
         match self {
             Self::Decrement => "--",
+            Self::Increment => "++",
             Self::Negation => "-",
             Self::Complement => "~",
             Self::Addition => "+",
@@ -174,6 +176,7 @@ impl FromStr for Operator {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "--" => Ok(Self::Decrement),
+            "++" => Ok(Self::Increment),
             "-" => Ok(Self::Negation),
             "~" => Ok(Self::Complement),
             "+" => Ok(Self::Addition),
