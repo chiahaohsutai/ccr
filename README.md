@@ -57,3 +57,12 @@ arch -x86_64 zsh
 # Run the compiler
 cargo run -- path/to/my_program.c
 ```
+
+### Testing
+
+To run the tests, clone the [writing-a-c-compiler-tests](https://github.com/nlsandler/writing-a-c-compiler-tests/) repository and follow the instructions in its README. The repository provides setup steps and detailed guidance for running the test suite against this compiler. This project implements all extra-credit features, so the extra-credit flag can be enabled when running the tests.
+
+```bash
+# Run the full test suite, including all extra-credit features
+./test_compiler path/to/compiler --extra-credit
+```
