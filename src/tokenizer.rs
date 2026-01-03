@@ -98,6 +98,16 @@ impl Operator {
         )
     }
 
+    /// Returns `true` if this operator is the increment operator.
+    fn is_increment(&self) -> bool {
+        matches!(self, Self::Increment)
+    }
+
+    /// Returns `true` if this operator is the decrement operator.
+    fn is_decrement(&self) -> bool {
+        matches!(self, Self::Decrement)
+    }
+
     /// Returns the precedence level of this operator.
     ///
     /// Higher values indicate higher precedence. Operators that do not participate
@@ -367,6 +377,22 @@ impl Token {
     pub fn is_assignment_operator(&self) -> bool {
         match self {
             Self::Operator(op) => op.is_assignment(),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this token represents an increment operator (`++`).
+    pub fn is_increment_operator(&self) -> bool {
+        match self {
+            Self::Operator(op) => op.is_increment(),
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if this token represents a decrement operator (`--`).
+    pub fn is_decrement_operator(&self) -> bool {
+        match self {
+            Self::Operator(op) => op.is_decrement(),
             _ => false,
         }
     }

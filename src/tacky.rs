@@ -21,6 +21,7 @@ impl From<parser::UnaryOperator> for UnaryOperator {
             parser::UnaryOperator::Complement => Self::Complement,
             parser::UnaryOperator::Negation => Self::Negation,
             parser::UnaryOperator::LogicalNot => Self::LogicalNot,
+            _ => todo!(),
         }
     }
 }

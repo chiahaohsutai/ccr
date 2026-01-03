@@ -6,19 +6,27 @@ use nanoid_dictionary::ALPHANUMERIC;
 
 use super::tokenizer;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum OperatorPosition {
+    Prefix,
+    Postfix,
+}
+
 /// Represents unary operators that operate on a single operand.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
+    Decrement(OperatorPosition),
+    Increment(OperatorPosition),
     Negation,
     LogicalNot,
     Complement,
 }
 
-impl TryFrom<tokenizer::Operator> for UnaryOperator {
-    type Error = String;
-
-    fn try_from(op: tokenizer::Operator) -> Result<Self, Self::Error> {
+impl UnaryOperator {
+    fn try_from_op(op: tokenizer::Operator, position: OperatorPosition) -> Result<Self, String> {
         match op {
+            tokenizer::Operator::Decrement => Ok(Self::Decrement(position)),
+            tokenizer::Operator::Increment => Ok(Self::Increment(position)),
             tokenizer::Operator::Negation => Ok(Self::Negation),
             tokenizer::Operator::Complement => Ok(Self::Complement),
             tokenizer::Operator::LogicalNot => Ok(Self::LogicalNot),
@@ -27,23 +35,14 @@ impl TryFrom<tokenizer::Operator> for UnaryOperator {
     }
 }
 
-impl TryFrom<tokenizer::Token> for UnaryOperator {
-    type Error = String;
-
-    fn try_from(token: tokenizer::Token) -> Result<Self, Self::Error> {
-        match token {
-            tokenizer::Token::Operator(op) => Self::try_from(op),
-            _ => Err(String::from("Token is not an operator.")),
-        }
-    }
-}
-
 impl fmt::Display for UnaryOperator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Negation => write!(f, "-"),
-            Self::LogicalNot => write!(f, "!"),
+            Self::Decrement(_) => write!(f, "--"),
+            Self::Increment(_) => write!(f, "++"),
             Self::Complement => write!(f, "~"),
+            Self::LogicalNot => write!(f, "!"),
+            Self::Negation => write!(f, "-"),
         }
     }
 }
@@ -203,7 +202,11 @@ pub enum Factor {
 impl Factor {
     /// Returns `true` if this factor is an identifier.
     fn is_identifier(&self) -> bool {
-        matches!(self, Self::Identifier(_))
+        match self {
+            Self::Identifier(_) => true,
+            Self::Expression(expr) => expr.is_identifier(),
+            _ => false,
+        }
     }
 
     /// Parses a factor from the front of the token stream.
@@ -212,16 +215,17 @@ impl Factor {
     /// parenthesized expression. Consumes the tokens required to form
     /// the factor and returns an error if the input is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
-        match tokens.pop_front() {
-            Some(tokenizer::Token::Identifier(name)) => Ok(Self::Identifier(name)),
-            Some(tokenizer::Token::Constant(value)) => Ok(Self::Int(value)),
-            Some(tokenizer::Token::Operator(op)) => {
-                let factor = Box::new(Self::parse(tokens)?);
-                UnaryOperator::try_from(op)
-                    .map_err(|_| format!("Unexpected unary operator '{}' in factor.", op))
-                    .map(|op| Self::Unary(op, factor))
+        let mut fac = match tokens
+            .pop_front()
+            .ok_or("Unexpected end of input while parsing factor")?
+        {
+            tokenizer::Token::Identifier(name) => Ok(Self::Identifier(name)),
+            tokenizer::Token::Constant(v) => Ok(Self::Int(v)),
+            tokenizer::Token::Operator(op) => {
+                let op = UnaryOperator::try_from_op(op, OperatorPosition::Prefix)?;
+                Ok(Factor::Unary(op, Box::new(Self::parse(tokens)?)))
             }
-            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
+            tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen) => {
                 let expr = Expression::parse(tokens, 0)?;
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
@@ -231,7 +235,21 @@ impl Factor {
                 }
             }
             tok => Err(format!("Malformed factor, found {tok:?}.")),
+        }?;
+        while tokens
+            .front()
+            .is_some_and(|t| t.is_decrement_operator() || t.is_increment_operator())
+        {
+            let tok = tokens.pop_front().unwrap();
+            if tok.is_decrement_operator() {
+                let op = UnaryOperator::Decrement(OperatorPosition::Postfix);
+                fac = Factor::Unary(op, Box::new(fac));
+            } else {
+                let op = UnaryOperator::Increment(OperatorPosition::Postfix);
+                fac = Factor::Unary(op, Box::new(fac));
+            }
         }
+        Ok(fac)
     }
 
     /// Resolves identifiers within the factor using the provided symbol table.
@@ -249,11 +267,17 @@ impl Factor {
                 let expr = Box::new(Expression::resolve(*expr, variables)?);
                 Ok(Self::Expression(expr))
             }
-            Self::Unary(op, factor) => {
-                let factor = Box::new(Factor::resolve(*factor, variables)?);
-                Ok(Self::Unary(op, factor))
+            Self::Unary(op, fac) => {
+                let fac = Factor::resolve(*fac, variables)?;
+                let is_ident = fac.is_identifier();
+                match op {
+                    UnaryOperator::Decrement(_) | UnaryOperator::Increment(_) if !is_ident => {
+                        Err(String::from("Invalid operand in unary operation"))
+                    }
+                    _ => Ok(Self::Unary(op, Box::new(fac))),
+                }
             }
-            factor => Ok(factor),
+            Self::Int(_) => Ok(factor),
         }
     }
 }
@@ -262,7 +286,10 @@ impl fmt::Display for Factor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Int(n) => write!(f, "{n}"),
-            Self::Unary(op, fac) => write!(f, "{op}{fac}"),
+            Self::Unary(op, fac) => match op {
+                UnaryOperator::Decrement(OperatorPosition::Postfix) => write!(f, "{fac}{op}"),
+                _ => write!(f, "{op}{fac}"),
+            },
             Self::Expression(e) => write!(f, "({e})"),
             Self::Identifier(i) => write!(f, "{i}"),
         }
@@ -283,7 +310,7 @@ impl Expression {
     /// Returns `true` if this expression resolves to an identifier.
     fn is_identifier(&self) -> bool {
         match self {
-            Self::Factor(f) if f.is_identifier() => true,
+            Self::Factor(f) => f.is_identifier(),
             _ => false,
         }
     }
@@ -462,7 +489,7 @@ impl BlockItem {
                             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
                                 Ok(Self::Declaration(Declaration(name, Some(expr))))
                             }
-                            _ => Err(String::from("Expected ';' after declaration.")),
+                            tok => Err(format!("Expected ';' after declaration, found: {tok:?}")),
                         }
                     }
                     _ => Err(String::from("Expected ';' or '=' after variable name.")),
