@@ -88,12 +88,14 @@ impl fmt::Display for UnaryOperator {
     }
 }
 
-impl From<tacky::UnaryOperator> for UnaryOperator {
-    fn from(op: tacky::UnaryOperator) -> Self {
+impl TryFrom<tacky::UnaryOperator> for UnaryOperator {
+    type Error = String;
+
+    fn try_from(op: tacky::UnaryOperator) -> Result<Self, String> {
         match op {
-            tacky::UnaryOperator::Negation => Self::Neg,
-            tacky::UnaryOperator::Complement => Self::Not,
-            _ => todo!(),
+            tacky::UnaryOperator::Negation => Ok(Self::Neg),
+            tacky::UnaryOperator::Complement => Ok(Self::Not),
+            op => Err(format!("Inavalid assembly operator: {op}")),
         }
     }
 }
@@ -283,7 +285,9 @@ impl fmt::Display for Function {
 }
 
 /// Generate pseudo-instructions for a given tacky instruction.
-fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruction> {
+fn generate_pseudo_instructions(
+    instruction: tacky::Instruction,
+) -> Result<Vec<Instruction>, String> {
     let mut instructions: Vec<Instruction> = Vec::new();
     match instruction {
         tacky::Instruction::Return(operand) => {
@@ -298,7 +302,7 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
             instructions.push(Instruction::SetCc(Condition::EqualEqual, dst));
         }
         tacky::Instruction::Unary(op, src, dest) => {
-            let op = UnaryOperator::from(op);
+            let op = UnaryOperator::try_from(op)?;
             let src = Operand::from(src);
             let dest = Operand::from(dest);
             instructions.push(Instruction::Mov(src, dest.clone()));
@@ -369,7 +373,7 @@ fn generate_pseudo_instructions(instruction: tacky::Instruction) -> Vec<Instruct
             instructions.push(Instruction::Mov(Operand::from(lhs), Operand::from(rhs)));
         }
     };
-    instructions
+    Ok(instructions)
 }
 
 // Replace pseudo-operands with stack offsets.
@@ -489,15 +493,17 @@ fn fix_invalid_instruction(instruction: Instruction) -> Vec<Instruction> {
     instructions
 }
 
-impl From<tacky::Function> for Function {
-    fn from(func: tacky::Function) -> Self {
+impl TryFrom<tacky::Function> for Function {
+    type Error = String;
+
+    fn try_from(func: tacky::Function) -> Result<Self, String> {
         let name = String::from(func.name());
 
         let mut instructions: Vec<Instruction> = Vec::new();
         instructions.push(Instruction::Allocate(0));
 
         for instr in Vec::from(func) {
-            let asm_instructions = generate_pseudo_instructions(instr);
+            let asm_instructions = generate_pseudo_instructions(instr)?;
             instructions.extend(asm_instructions);
         }
 
@@ -515,7 +521,7 @@ impl From<tacky::Function> for Function {
             .flat_map(|instr| fix_invalid_instruction(instr))
             .collect::<Vec<Instruction>>();
 
-        Self(name, instructions)
+        Ok(Self(name, instructions))
     }
 }
 
@@ -523,10 +529,12 @@ impl From<tacky::Function> for Function {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program(Function);
 
-impl From<tacky::Program> for Program {
-    fn from(program: tacky::Program) -> Self {
+impl TryFrom<tacky::Program> for Program {
+    type Error = String;
+
+    fn try_from(program: tacky::Program) -> Result<Self, String> {
         let function = tacky::Function::from(program);
-        Self(Function::from(function))
+        Ok(Self(Function::try_from(function)?))
     }
 }
 

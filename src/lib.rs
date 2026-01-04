@@ -38,7 +38,7 @@ fn compile<T: AsRef<path::Path>>(
     if matches!(stop_after, Some(CompileStep::TACKY)) {
         return Ok(None);
     }
-    let instructions = codegen::Program::from(tac);
+    let instructions = codegen::Program::try_from(tac)?;
     if matches!(stop_after, Some(CompileStep::CODEGEN)) {
         return Ok(None);
     };

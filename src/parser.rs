@@ -6,31 +6,45 @@ use nanoid_dictionary::ALPHANUMERIC;
 
 use super::tokenizer;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum OperatorPosition {
-    Prefix,
-    Postfix,
-}
-
 /// Represents unary operators that operate on a single operand.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UnaryOperator {
-    Decrement(OperatorPosition),
-    Increment(OperatorPosition),
+    Decrement,
+    Increment,
     Negation,
     LogicalNot,
     Complement,
 }
 
 impl UnaryOperator {
-    fn try_from_op(op: tokenizer::Operator, position: OperatorPosition) -> Result<Self, String> {
-        match op {
-            tokenizer::Operator::Decrement => Ok(Self::Decrement(position)),
-            tokenizer::Operator::Increment => Ok(Self::Increment(position)),
+    /// Returns `true` if this operator is the increment or decrement operator.
+    fn is_incr_or_decr(&self) -> bool {
+        matches!(self, Self::Increment | Self::Decrement)
+    }
+}
+
+impl TryFrom<tokenizer::Operator> for UnaryOperator {
+    type Error = String;
+
+    fn try_from(value: tokenizer::Operator) -> Result<Self, Self::Error> {
+        match value {
+            tokenizer::Operator::Decrement => Ok(Self::Decrement),
+            tokenizer::Operator::Increment => Ok(Self::Increment),
             tokenizer::Operator::Negation => Ok(Self::Negation),
             tokenizer::Operator::Complement => Ok(Self::Complement),
             tokenizer::Operator::LogicalNot => Ok(Self::LogicalNot),
-            _ => Err(format!("Operator '{op}' is not a unary operator.")),
+            _ => Err(format!("Operator '{value}' is not a unary operator.")),
+        }
+    }
+}
+
+impl TryFrom<tokenizer::Token> for UnaryOperator {
+    type Error = String;
+
+    fn try_from(value: tokenizer::Token) -> Result<Self, Self::Error> {
+        match value {
+            tokenizer::Token::Operator(op) => Self::try_from(op),
+            _ => Err(format!("Token '{value}' is not a unary operator.")),
         }
     }
 }
@@ -38,8 +52,8 @@ impl UnaryOperator {
 impl fmt::Display for UnaryOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Decrement(_) => write!(f, "--"),
-            Self::Increment(_) => write!(f, "++"),
+            Self::Decrement => write!(f, "--"),
+            Self::Increment => write!(f, "++"),
             Self::Complement => write!(f, "~"),
             Self::LogicalNot => write!(f, "!"),
             Self::Negation => write!(f, "-"),
@@ -84,28 +98,28 @@ pub enum BinaryOperator {
 impl BinaryOperator {
     // Returns `true` if this operator is an assignment or compound assignment operator.
     pub fn is_assignment(&self) -> bool {
-        matches!(
-            self,
-            Self::AddAssignment
-                | Self::SubAssignment
-                | Self::DivAssignment
-                | Self::ProdAssignment
-                | Self::RemAssignment
-                | Self::AndAssignment
-                | Self::OrAssignment
-                | Self::XorAssignment
-                | Self::LShiftAssignment
-                | Self::RShiftAssignment
-                | Self::Assignment
-        )
+        match self {
+            Self::AddAssignment => true,
+            Self::SubAssignment => true,
+            Self::DivAssignment => true,
+            Self::RemAssignment => true,
+            Self::ProdAssignment => true,
+            Self::AndAssignment => true,
+            Self::OrAssignment => true,
+            Self::XorAssignment => true,
+            Self::LShiftAssignment => true,
+            Self::RShiftAssignment => true,
+            Self::Assignment => true,
+            _ => false,
+        }
     }
 }
 
 impl TryFrom<tokenizer::Operator> for BinaryOperator {
     type Error = String;
 
-    fn try_from(op: tokenizer::Operator) -> Result<Self, Self::Error> {
-        match op {
+    fn try_from(value: tokenizer::Operator) -> Result<Self, Self::Error> {
+        match value {
             tokenizer::Operator::Addition => Ok(Self::Add),
             tokenizer::Operator::Negation => Ok(Self::Substract),
             tokenizer::Operator::Product => Ok(Self::Multiply),
@@ -135,7 +149,7 @@ impl TryFrom<tokenizer::Operator> for BinaryOperator {
             tokenizer::Operator::XorAssignment => Ok(Self::XorAssignment),
             tokenizer::Operator::LShiftAssignment => Ok(Self::LShiftAssignment),
             tokenizer::Operator::RShiftAssignment => Ok(Self::RShiftAssignment),
-            _ => Err(format!("Operator '{op}' is not a binary operator.")),
+            _ => Err(format!("Operator '{value}' is not a binary operator.")),
         }
     }
 }
@@ -145,7 +159,7 @@ impl TryFrom<tokenizer::Token> for BinaryOperator {
 
     fn try_from(token: tokenizer::Token) -> Result<Self, Self::Error> {
         match token {
-            tokenizer::Token::Operator(op) => Self::try_from(op),
+            tokenizer::Token::Operator(operator) => Self::try_from(operator),
             _ => Err(String::from("Token is not an operator.")),
         }
     }
@@ -187,6 +201,16 @@ impl fmt::Display for BinaryOperator {
     }
 }
 
+/// Represents the fixity of an operator.
+///
+/// Fixity describes whether an operator appears in prefix or postfix position
+/// relative to its operand.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Fixity {
+    Prefix,
+    Postfix,
+}
+
 /// Represents a factor in an expression.
 ///
 /// A factor is the smallest unit in an expression and may be a constant,
@@ -195,16 +219,16 @@ impl fmt::Display for BinaryOperator {
 pub enum Factor {
     Int(u64),
     Identifier(String),
-    Unary(UnaryOperator, Box<Factor>),
+    Unary(UnaryOperator, Fixity, Box<Factor>),
     Expression(Box<Expression>),
 }
 
 impl Factor {
     /// Returns `true` if this factor is an identifier.
-    fn is_identifier(&self) -> bool {
+    fn is_ident(&self) -> bool {
         match self {
             Self::Identifier(_) => true,
-            Self::Expression(expr) => expr.is_identifier(),
+            Self::Expression(expression) => expression.is_ident(),
             _ => false,
         }
     }
@@ -215,41 +239,39 @@ impl Factor {
     /// parenthesized expression. Consumes the tokens required to form
     /// the factor and returns an error if the input is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
-        let mut fac = match tokens
-            .pop_front()
-            .ok_or("Unexpected end of input while parsing factor")?
-        {
-            tokenizer::Token::Identifier(name) => Ok(Self::Identifier(name)),
-            tokenizer::Token::Constant(v) => Ok(Self::Int(v)),
-            tokenizer::Token::Operator(op) => {
-                let op = UnaryOperator::try_from_op(op, OperatorPosition::Prefix)?;
-                Ok(Factor::Unary(op, Box::new(Self::parse(tokens)?)))
+        let mut factor = match tokens.pop_front() {
+            Some(tokenizer::Token::Identifier(name)) => Ok(Self::Identifier(name)),
+            Some(tokenizer::Token::Constant(constant)) => Ok(Self::Int(constant)),
+            Some(tokenizer::Token::Operator(operator)) => {
+                let operator = UnaryOperator::try_from(operator)?;
+                let factor = Box::new(Self::parse(tokens)?);
+                Ok(Factor::Unary(operator, Fixity::Prefix, factor))
             }
-            tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen) => {
-                let expr = Expression::parse(tokens, 0)?;
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
+                let expression = Expression::parse(tokens, 0)?;
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
-                        Ok(Self::Expression(Box::new(expr)))
+                        Ok(Self::Expression(Box::new(expression)))
                     }
                     _ => Err(String::from("Expected ')' after expression.")),
                 }
             }
-            tok => Err(format!("Malformed factor, found {tok:?}.")),
+            Some(token) => Err(format!("Malformed factor, found {token}.")),
+            None => Err(String::from("Unexpected end of input while parsing factor")),
         }?;
-        while tokens
-            .front()
-            .is_some_and(|t| t.is_decrement_operator() || t.is_increment_operator())
-        {
-            let tok = tokens.pop_front().unwrap();
-            if tok.is_decrement_operator() {
-                let op = UnaryOperator::Decrement(OperatorPosition::Postfix);
-                fac = Factor::Unary(op, Box::new(fac));
+
+        while tokens.front().is_some_and(|t| t.is_incr_or_decr_op()) {
+            let token = tokens.pop_front().unwrap();
+            let operand = Box::new(factor);
+            let operator = UnaryOperator::try_from(token)?;
+            if let UnaryOperator::Increment = operator {
+                factor = Factor::Unary(UnaryOperator::Increment, Fixity::Postfix, operand);
             } else {
-                let op = UnaryOperator::Increment(OperatorPosition::Postfix);
-                fac = Factor::Unary(op, Box::new(fac));
+                factor = Factor::Unary(UnaryOperator::Decrement, Fixity::Postfix, operand);
             }
         }
-        Ok(fac)
+
+        Ok(factor)
     }
 
     /// Resolves identifiers within the factor using the provided symbol table.
@@ -259,22 +281,20 @@ impl Factor {
     /// is undeclared.
     fn resolve(factor: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match factor {
-            Self::Identifier(ident) => match variables.get(&ident) {
+            Self::Identifier(identifier) => match variables.get(&identifier) {
                 Some(ident) => Ok(Self::Identifier(String::from(ident))),
                 None => Err(String::from("Undeclared variable")),
             },
-            Self::Expression(expr) => {
-                let expr = Box::new(Expression::resolve(*expr, variables)?);
-                Ok(Self::Expression(expr))
+            Self::Expression(expression) => {
+                let expression = Box::new(Expression::resolve(*expression, variables)?);
+                Ok(Self::Expression(expression))
             }
-            Self::Unary(op, fac) => {
-                let fac = Factor::resolve(*fac, variables)?;
-                let is_ident = fac.is_identifier();
-                match op {
-                    UnaryOperator::Decrement(_) | UnaryOperator::Increment(_) if !is_ident => {
-                        Err(String::from("Invalid operand in unary operation"))
-                    }
-                    _ => Ok(Self::Unary(op, Box::new(fac))),
+            Self::Unary(operator, fixity, factor) => {
+                let factor = Factor::resolve(*factor, variables)?;
+                if operator.is_incr_or_decr() && !factor.is_ident() {
+                    Err(String::from("Invalid operand in unary operation"))
+                } else {
+                    Ok(Self::Unary(operator, fixity, Box::new(factor)))
                 }
             }
             Self::Int(_) => Ok(factor),
@@ -285,13 +305,13 @@ impl Factor {
 impl fmt::Display for Factor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Int(n) => write!(f, "{n}"),
-            Self::Unary(op, fac) => match op {
-                UnaryOperator::Decrement(OperatorPosition::Postfix) => write!(f, "{fac}{op}"),
-                _ => write!(f, "{op}{fac}"),
+            Self::Int(number) => write!(f, "{number}"),
+            Self::Unary(operator, fixity, factor) => match fixity {
+                Fixity::Prefix => write!(f, "{operator}{factor}"),
+                Fixity::Postfix => write!(f, "{factor}{operator}"),
             },
-            Self::Expression(e) => write!(f, "({e})"),
-            Self::Identifier(i) => write!(f, "{i}"),
+            Self::Expression(expression) => write!(f, "({expression})"),
+            Self::Identifier(identifier) => write!(f, "{identifier}"),
         }
     }
 }
@@ -308,9 +328,9 @@ pub enum Expression {
 
 impl Expression {
     /// Returns `true` if this expression resolves to an identifier.
-    fn is_identifier(&self) -> bool {
+    fn is_ident(&self) -> bool {
         match self {
-            Self::Factor(f) => f.is_identifier(),
+            Self::Factor(factor) => factor.is_ident(),
             _ => false,
         }
     }
@@ -325,21 +345,21 @@ impl Expression {
 
         while tokens
             .front()
-            .is_some_and(|t| t.is_binary_operator() && t.precedence() >= precedence)
+            .is_some_and(|t| t.is_binary_op() && t.precedence() >= precedence)
         {
             let token = tokens.pop_front().unwrap();
             let precedence = token.precedence();
 
             match token {
-                tokenizer::Token::Operator(op) if token.is_assignment_operator() => {
+                tokenizer::Token::Operator(operator) if token.is_assignment_op() => {
                     let rhs = Expression::parse(tokens, precedence)?;
-                    let op = BinaryOperator::try_from(op)?;
-                    lhs = Self::Binary(Box::new(lhs), op, Box::new(rhs));
+                    let operator = BinaryOperator::try_from(operator)?;
+                    lhs = Self::Binary(Box::new(lhs), operator, Box::new(rhs));
                 }
                 _ => {
                     let rhs = Expression::parse(tokens, precedence + 1)?;
-                    let op = BinaryOperator::try_from(token).unwrap();
-                    lhs = Expression::Binary(Box::new(lhs), op, Box::new(rhs));
+                    let operator = BinaryOperator::try_from(token).unwrap();
+                    lhs = Expression::Binary(Box::new(lhs), operator, Box::new(rhs));
                 }
             }
         }
@@ -356,13 +376,13 @@ impl Expression {
     fn resolve(expression: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match expression {
             Self::Factor(factor) => Ok(Self::Factor(Factor::resolve(factor, variables)?)),
-            Self::Binary(lhs, op, rhs) => {
-                if op.is_assignment() && !lhs.is_identifier() {
+            Self::Binary(lhs, operator, rhs) => {
+                if operator.is_assignment() && !lhs.is_ident() {
                     Err(format!("Invalid lvalue in assignment: {lhs}"))
                 } else {
                     let lhs = Box::new(Expression::resolve(*lhs, variables)?);
                     let rhs = Box::new(Expression::resolve(*rhs, variables)?);
-                    Ok(Expression::Binary(lhs, op, rhs))
+                    Ok(Expression::Binary(lhs, operator, rhs))
                 }
             }
         }
@@ -435,8 +455,10 @@ impl Statement {
     /// Recursively resolves any expressions contained in the statement.
     fn resolve(statement: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         let stmt = match statement {
-            Self::Expression(expr) => Self::Expression(Expression::resolve(expr, variables)?),
-            Self::Return(expr) => Self::Return(Expression::resolve(expr, variables)?),
+            Self::Expression(expression) => {
+                Self::Expression(Expression::resolve(expression, variables)?)
+            }
+            Self::Return(expression) => Self::Return(Expression::resolve(expression, variables)?),
             Self::Null => Self::Null,
         };
         Ok(stmt)
@@ -447,8 +469,8 @@ impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Null => write!(f, ";"),
-            Self::Expression(expr) => write!(f, "{};", expr),
-            Self::Return(expr) => write!(f, "Return {};", expr),
+            Self::Expression(expression) => write!(f, "{};", expression),
+            Self::Return(expression) => write!(f, "return {};", expression),
         }
     }
 }
@@ -475,7 +497,7 @@ impl BlockItem {
             }
             Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
                 let name = match tokens.pop_front() {
-                    Some(tokenizer::Token::Identifier(id)) => Ok(id),
+                    Some(tokenizer::Token::Identifier(identifier)) => Ok(identifier),
                     None => Err(String::from("Unexpected end of input.")),
                     _ => Err(String::from("Expected identifier after 'int'.")),
                 }?;
@@ -496,10 +518,10 @@ impl BlockItem {
                 }
             }
             Some(tokenizer::Token::Keyword(tokenizer::Keyword::Return)) => {
-                let expr = Expression::parse(tokens, 0)?;
+                let expression = Expression::parse(tokens, 0)?;
                 let stmt = match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(Statement::Return(expr))
+                        Ok(Statement::Return(expression))
                     }
                     _ => Err(String::from("Expected ';' after return expression.")),
                 };
@@ -507,10 +529,10 @@ impl BlockItem {
             }
             Some(token) => {
                 tokens.push_front(token);
-                let expr = Expression::parse(tokens, 0)?;
+                let expression = Expression::parse(tokens, 0)?;
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(BlockItem::Statement(Statement::Expression(expr)))
+                        Ok(BlockItem::Statement(Statement::Expression(expression)))
                     }
                     _ => Err(String::from("Expected ';' after expression statement.")),
                 }
@@ -525,10 +547,14 @@ impl BlockItem {
     /// are recursively resolved.
     fn resolve(item: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match item {
-            Self::Declaration(decl) => {
-                Ok(Self::Declaration(Declaration::resolve(decl, variables)?))
+            Self::Declaration(declaration) => {
+                let declaration = Declaration::resolve(declaration, variables)?;
+                Ok(Self::Declaration(declaration))
             }
-            Self::Statement(stmt) => Ok(BlockItem::Statement(Statement::resolve(stmt, variables)?)),
+            Self::Statement(stmt) => {
+                let statement = Statement::resolve(stmt, variables)?;
+                Ok(BlockItem::Statement(statement))
+            }
         }
     }
 }
@@ -536,8 +562,8 @@ impl BlockItem {
 impl fmt::Display for BlockItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Declaration(decl) => write!(f, "{}", decl.0),
-            Self::Statement(stmt) => write!(f, "{}", stmt),
+            Self::Declaration(declaration) => write!(f, "{} {:?}", declaration.0, declaration.1),
+            Self::Statement(statement) => write!(f, "{}", statement),
         }
     }
 }

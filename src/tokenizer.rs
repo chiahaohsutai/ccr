@@ -98,14 +98,9 @@ impl Operator {
         )
     }
 
-    /// Returns `true` if this operator is the increment operator.
-    fn is_increment(&self) -> bool {
-        matches!(self, Self::Increment)
-    }
-
-    /// Returns `true` if this operator is the decrement operator.
-    fn is_decrement(&self) -> bool {
-        matches!(self, Self::Decrement)
+    /// Returns `true` if this operator is the increment or decrement operator.
+    fn is_incr_or_decr(&self) -> bool {
+        matches!(self, Self::Increment | Self::Decrement)
     }
 
     /// Returns the precedence level of this operator.
@@ -364,7 +359,7 @@ impl Token {
     /// Returns `true` if this token represents a binary operator.
     ///
     /// Non-operator tokens and unary operators return `false`.
-    pub fn is_binary_operator(&self) -> bool {
+    pub fn is_binary_op(&self) -> bool {
         match self {
             Self::Operator(op) => op.is_binary(),
             _ => false,
@@ -374,25 +369,17 @@ impl Token {
     /// Returns `true` if this token represents a assignment or compound assignment operator.
     ///
     /// Non-operator tokens return `false`.
-    pub fn is_assignment_operator(&self) -> bool {
+    pub fn is_assignment_op(&self) -> bool {
         match self {
             Self::Operator(op) => op.is_assignment(),
             _ => false,
         }
     }
 
-    /// Returns `true` if this token represents an increment operator (`++`).
-    pub fn is_increment_operator(&self) -> bool {
+    /// Returns `true` if this token represents an increment or decrement operator.
+    pub fn is_incr_or_decr_op(&self) -> bool {
         match self {
-            Self::Operator(op) => op.is_increment(),
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if this token represents a decrement operator (`--`).
-    pub fn is_decrement_operator(&self) -> bool {
-        match self {
-            Self::Operator(op) => op.is_decrement(),
+            Self::Operator(op) => op.is_incr_or_decr(),
             _ => false,
         }
     }
