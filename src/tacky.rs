@@ -201,35 +201,29 @@ impl fmt::Display for Instruction {
 fn lin_assign_expr(
     lhs: parser::Expression,
     rhs: parser::Expression,
-    instructions: &mut Vec<Instruction>,
-) -> Result<Operand, String> {
-    let rhs = lin_expr(rhs, instructions)?;
-    let lhs = Operand::try_from(lhs)?;
-    instructions.push(Instruction::Copy(rhs, lhs.clone()));
-    Ok(lhs)
-}
-
-fn lin_comp_assign_expr(
     op: parser::BinaryOperator,
-    lhs: parser::Expression,
-    rhs: parser::Expression,
     instructions: &mut Vec<Instruction>,
 ) -> Result<Operand, String> {
     let rhs = lin_expr(rhs, instructions)?;
     let lhs = Operand::try_from(lhs)?;
 
-    let temp = Operand::temp();
-    let op = BinaryOperator::try_from(op)
-        .map_err(|_| format!("Expected compound asssignment op, found: {op}"))?;
+    if !matches!(op, parser::BinaryOperator::Assignment) {
+        let temp = Operand::temp();
+        let op = BinaryOperator::try_from(op)
+            .map_err(|_| format!("Expected compound asssignment op, found: {op}"))?;
 
-    instructions.push(Instruction::Binary(op, lhs.clone(), rhs, temp.clone()));
-    instructions.push(Instruction::Copy(temp, lhs.clone()));
+        instructions.push(Instruction::Binary(op, lhs.clone(), rhs, temp.clone()));
+        instructions.push(Instruction::Copy(temp, lhs.clone()));
+    } else {
+        instructions.push(Instruction::Copy(rhs, lhs.clone()));
+    };
     Ok(lhs)
 }
 
-fn lin_log_and_expr(
+fn lin_log_expr(
     lhs: parser::Expression,
     rhs: parser::Expression,
+    op: parser::BinaryOperator,
     instructions: &mut Vec<Instruction>,
 ) -> Result<Operand, String> {
     let lhs = lin_expr(lhs, instructions)?;
@@ -239,43 +233,28 @@ fn lin_log_and_expr(
 
     let dst = Operand::temp();
     let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
-    let isfalse = format!("label.{}", nanoid!(21, ALPHANUMERIC));
 
-    instructions.push(Instruction::JumpIfZero(lhs, String::from(&isfalse)));
-    instructions.extend(rhs_instructions);
-    instructions.push(Instruction::JumpIfZero(rhs, String::from(&isfalse)));
-    instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
-    instructions.push(Instruction::Jump(end.clone()));
-    instructions.push(Instruction::Label(isfalse));
-    instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
-    instructions.push(Instruction::Label(end));
-
-    Ok(dst)
-}
-
-fn lin_log_or_expr(
-    lhs: parser::Expression,
-    rhs: parser::Expression,
-    instructions: &mut Vec<Instruction>,
-) -> Result<Operand, String> {
-    let lhs = lin_expr(lhs, instructions)?;
-
-    let mut rhs_instructions: Vec<Instruction> = Vec::new();
-    let rhs = lin_expr(rhs, &mut rhs_instructions)?;
-
-    let dst = Operand::temp();
-    let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
-    let istrue = format!("label.{}", nanoid!(21, ALPHANUMERIC));
-
-    instructions.push(Instruction::JumpIfNotZero(lhs, String::from(&istrue)));
-    instructions.extend(rhs_instructions);
-    instructions.push(Instruction::JumpIfNotZero(rhs, String::from(&istrue)));
-    instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
-    instructions.push(Instruction::Jump(end.clone()));
-    instructions.push(Instruction::Label(istrue));
-    instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
-    instructions.push(Instruction::Label(end));
-
+    if matches!(op, parser::BinaryOperator::LogicalAnd) {
+        let isfalse = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+        instructions.push(Instruction::JumpIfZero(lhs, String::from(&isfalse)));
+        instructions.extend(rhs_instructions);
+        instructions.push(Instruction::JumpIfZero(rhs, String::from(&isfalse)));
+        instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
+        instructions.push(Instruction::Jump(end.clone()));
+        instructions.push(Instruction::Label(isfalse));
+        instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
+        instructions.push(Instruction::Label(end));
+    } else {
+        let istrue = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+        instructions.push(Instruction::JumpIfNotZero(lhs, String::from(&istrue)));
+        instructions.extend(rhs_instructions);
+        instructions.push(Instruction::JumpIfNotZero(rhs, String::from(&istrue)));
+        instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
+        instructions.push(Instruction::Jump(end.clone()));
+        instructions.push(Instruction::Label(istrue));
+        instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
+        instructions.push(Instruction::Label(end));
+    }
     Ok(dst)
 }
 
@@ -286,10 +265,10 @@ fn lin_bin_expr(
     instructions: &mut Vec<Instruction>,
 ) -> Result<Operand, String> {
     match op {
-        parser::BinaryOperator::Assignment => lin_assign_expr(lhs, rhs, instructions),
-        parser::BinaryOperator::LogicalAnd => lin_log_and_expr(lhs, rhs, instructions),
-        parser::BinaryOperator::LogicalOr => lin_log_or_expr(lhs, rhs, instructions),
-        op if op.is_assignment() => lin_comp_assign_expr(op, lhs, rhs, instructions),
+        parser::BinaryOperator::LogicalAnd => lin_log_expr(lhs, rhs, op, instructions),
+        parser::BinaryOperator::LogicalOr => lin_log_expr(lhs, rhs, op, instructions),
+        parser::BinaryOperator::Assignment => lin_assign_expr(lhs, rhs, op, instructions),
+        op if op.is_assignment() => lin_assign_expr(lhs, rhs, op, instructions),
         op => {
             let dst = Operand::temp();
             let lhs = lin_expr(lhs, instructions)?;
