@@ -81,16 +81,16 @@ impl TryFrom<parser::BinaryOperator> for BinaryOperator {
             parser::BinaryOperator::GreaterThan => Ok(Self::GreaterThan),
             parser::BinaryOperator::LessThanOrEq => Ok(Self::LessThanOrEq),
             parser::BinaryOperator::GreaterThanOrEq => Ok(Self::GreaterThanOrEq),
-            parser::BinaryOperator::AddAssignment => Ok(BinaryOperator::Add),
-            parser::BinaryOperator::SubAssignment => Ok(BinaryOperator::Subtract),
-            parser::BinaryOperator::DivAssignment => Ok(BinaryOperator::Divide),
-            parser::BinaryOperator::RemAssignment => Ok(BinaryOperator::Remainder),
-            parser::BinaryOperator::ProdAssignment => Ok(BinaryOperator::Multiply),
-            parser::BinaryOperator::AndAssignment => Ok(BinaryOperator::BitwiseAnd),
-            parser::BinaryOperator::OrAssignment => Ok(BinaryOperator::BitwiseOr),
-            parser::BinaryOperator::XorAssignment => Ok(BinaryOperator::BitwiseXor),
-            parser::BinaryOperator::LShiftAssignment => Ok(BinaryOperator::LeftShift),
-            parser::BinaryOperator::RShiftAssignment => Ok(BinaryOperator::RightShift),
+            parser::BinaryOperator::AddAssignment => Ok(Self::Add),
+            parser::BinaryOperator::SubAssignment => Ok(Self::Subtract),
+            parser::BinaryOperator::DivAssignment => Ok(Self::Divide),
+            parser::BinaryOperator::RemAssignment => Ok(Self::Remainder),
+            parser::BinaryOperator::ProdAssignment => Ok(Self::Multiply),
+            parser::BinaryOperator::AndAssignment => Ok(Self::BitwiseAnd),
+            parser::BinaryOperator::OrAssignment => Ok(Self::BitwiseOr),
+            parser::BinaryOperator::XorAssignment => Ok(Self::BitwiseXor),
+            parser::BinaryOperator::LShiftAssignment => Ok(Self::LeftShift),
+            parser::BinaryOperator::RShiftAssignment => Ok(Self::RightShift),
             _ => Err(format!("Operator '{:?}' is not a tacky binary op.", op)),
         }
     }
@@ -202,9 +202,9 @@ fn lin_assign_expr(
     lhs: parser::Expression,
     rhs: parser::Expression,
     op: parser::BinaryOperator,
-    instructions: &mut Vec<Instruction>,
+    body: &mut Vec<Instruction>,
 ) -> Result<Operand, String> {
-    let rhs = lin_expr(rhs, instructions)?;
+    let rhs = lin_expr(rhs, body)?;
     let lhs = Operand::try_from(lhs)?;
 
     if !matches!(op, parser::BinaryOperator::Assignment) {
@@ -212,10 +212,10 @@ fn lin_assign_expr(
         let op = BinaryOperator::try_from(op)
             .map_err(|_| format!("Expected compound asssignment op, found: {op}"))?;
 
-        instructions.push(Instruction::Binary(op, lhs.clone(), rhs, temp.clone()));
-        instructions.push(Instruction::Copy(temp, lhs.clone()));
+        body.push(Instruction::Binary(op, lhs.clone(), rhs, temp.clone()));
+        body.push(Instruction::Copy(temp, lhs.clone()));
     } else {
-        instructions.push(Instruction::Copy(rhs, lhs.clone()));
+        body.push(Instruction::Copy(rhs, lhs.clone()));
     };
     Ok(lhs)
 }
@@ -224,36 +224,36 @@ fn lin_log_expr(
     lhs: parser::Expression,
     rhs: parser::Expression,
     op: parser::BinaryOperator,
-    instructions: &mut Vec<Instruction>,
+    body: &mut Vec<Instruction>,
 ) -> Result<Operand, String> {
-    let lhs = lin_expr(lhs, instructions)?;
+    let lhs = lin_expr(lhs, body)?;
 
-    let mut rhs_instructions: Vec<Instruction> = Vec::new();
-    let rhs = lin_expr(rhs, &mut rhs_instructions)?;
+    let mut instructions: Vec<Instruction> = Vec::new();
+    let rhs = lin_expr(rhs, &mut instructions)?;
 
     let dst = Operand::temp();
     let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
 
     if matches!(op, parser::BinaryOperator::LogicalAnd) {
         let isfalse = format!("label.{}", nanoid!(21, ALPHANUMERIC));
-        instructions.push(Instruction::JumpIfZero(lhs, String::from(&isfalse)));
-        instructions.extend(rhs_instructions);
-        instructions.push(Instruction::JumpIfZero(rhs, String::from(&isfalse)));
-        instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
-        instructions.push(Instruction::Jump(end.clone()));
-        instructions.push(Instruction::Label(isfalse));
-        instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
-        instructions.push(Instruction::Label(end));
+        body.push(Instruction::JumpIfZero(lhs, String::from(&isfalse)));
+        body.extend(instructions);
+        body.push(Instruction::JumpIfZero(rhs, String::from(&isfalse)));
+        body.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
+        body.push(Instruction::Jump(end.clone()));
+        body.push(Instruction::Label(isfalse));
+        body.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
+        body.push(Instruction::Label(end));
     } else {
         let istrue = format!("label.{}", nanoid!(21, ALPHANUMERIC));
-        instructions.push(Instruction::JumpIfNotZero(lhs, String::from(&istrue)));
-        instructions.extend(rhs_instructions);
-        instructions.push(Instruction::JumpIfNotZero(rhs, String::from(&istrue)));
-        instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
-        instructions.push(Instruction::Jump(end.clone()));
-        instructions.push(Instruction::Label(istrue));
-        instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
-        instructions.push(Instruction::Label(end));
+        body.push(Instruction::JumpIfNotZero(lhs, String::from(&istrue)));
+        body.extend(instructions);
+        body.push(Instruction::JumpIfNotZero(rhs, String::from(&istrue)));
+        body.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
+        body.push(Instruction::Jump(end.clone()));
+        body.push(Instruction::Label(istrue));
+        body.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
+        body.push(Instruction::Label(end));
     }
     Ok(dst)
 }
@@ -262,49 +262,72 @@ fn lin_bin_expr(
     op: parser::BinaryOperator,
     lhs: parser::Expression,
     rhs: parser::Expression,
-    instructions: &mut Vec<Instruction>,
+    body: &mut Vec<Instruction>,
 ) -> Result<Operand, String> {
     match op {
-        parser::BinaryOperator::LogicalAnd => lin_log_expr(lhs, rhs, op, instructions),
-        parser::BinaryOperator::LogicalOr => lin_log_expr(lhs, rhs, op, instructions),
-        parser::BinaryOperator::Assignment => lin_assign_expr(lhs, rhs, op, instructions),
-        op if op.is_assignment() => lin_assign_expr(lhs, rhs, op, instructions),
+        parser::BinaryOperator::LogicalAnd => lin_log_expr(lhs, rhs, op, body),
+        parser::BinaryOperator::LogicalOr => lin_log_expr(lhs, rhs, op, body),
+        parser::BinaryOperator::Assignment => lin_assign_expr(lhs, rhs, op, body),
+        op if op.is_assignment() => lin_assign_expr(lhs, rhs, op, body),
         op => {
             let dst = Operand::temp();
-            let lhs = lin_expr(lhs, instructions)?;
-            let rhs = lin_expr(rhs, instructions)?;
+            let lhs = lin_expr(lhs, body)?;
+            let rhs = lin_expr(rhs, body)?;
             let op = BinaryOperator::try_from(op).unwrap();
-            instructions.push(Instruction::Binary(op, lhs, rhs, dst.clone()));
+            body.push(Instruction::Binary(op, lhs, rhs, dst.clone()));
             Ok(dst)
         }
     }
 }
 
-fn lin_factor(
-    factor: parser::Factor,
-    instructions: &mut Vec<Instruction>,
-) -> Result<Operand, String> {
+fn lin_factor(factor: parser::Factor, body: &mut Vec<Instruction>) -> Result<Operand, String> {
     match factor {
         parser::Factor::Int(n) => Ok(Operand::Constant(n)),
-        parser::Factor::Expression(expression) => Ok(lin_expr(*expression, instructions)?),
+        parser::Factor::Expression(expression) => Ok(lin_expr(*expression, body)?),
         parser::Factor::Identifier(identifier) => Ok(Operand::Variable(identifier)),
-        parser::Factor::Unary(op, _, fac) => {
-            let src = lin_factor(*fac, instructions)?;
-            let dst = Operand::Variable(format!("temp.{}", nanoid!(21, ALPHANUMERIC)));
-            let op = UnaryOperator::from(op);
-            instructions.push(Instruction::Unary(op, src, dst.clone()));
-            Ok(dst)
+        parser::Factor::Unary(op, fixity, fac) => {
+            let dst = Operand::temp();
+            match op {
+                parser::UnaryOperator::Increment | parser::UnaryOperator::Decrement => {
+                    let diff = Operand::Constant(1);
+                    let op = if matches!(op, parser::UnaryOperator::Increment) {
+                        BinaryOperator::Add
+                    } else {
+                        BinaryOperator::Subtract
+                    };
+                    if let parser::Fixity::Prefix = fixity {
+                        let src = lin_factor(*fac, body)?;
+                        body.push(Instruction::Binary(op, src.clone(), diff, dst.clone()));
+                        body.push(Instruction::Copy(dst.clone(), src));
+                        Ok(dst)
+                    } else {
+                        let src = lin_factor(*fac, body)?;
+                        body.push(Instruction::Copy(src.clone(), dst.clone()));
+                        let temp = Operand::temp();
+                        body.push(Instruction::Binary(op, src.clone(), diff, temp.clone()));
+                        body.push(Instruction::Copy(temp.clone(), src.clone()));
+                        Ok(dst)
+                    }
+                }
+                _ => {
+                    let src = lin_factor(*fac, body)?;
+                    let dst = Operand::temp();
+                    let op = UnaryOperator::from(op);
+                    body.push(Instruction::Unary(op, src, dst.clone()));
+                    Ok(dst)
+                }
+            }
         }
     }
 }
 
 fn lin_expr(
     expression: parser::Expression,
-    instructions: &mut Vec<Instruction>,
+    body: &mut Vec<Instruction>,
 ) -> Result<Operand, String> {
     match expression {
-        parser::Expression::Binary(lhs, op, rhs) => lin_bin_expr(op, *lhs, *rhs, instructions),
-        parser::Expression::Factor(factor) => lin_factor(factor, instructions),
+        parser::Expression::Binary(lhs, op, rhs) => lin_bin_expr(op, *lhs, *rhs, body),
+        parser::Expression::Factor(factor) => lin_factor(factor, body),
     }
 }
 
@@ -339,35 +362,35 @@ impl TryFrom<parser::Function> for Function {
 
     fn try_from(function: parser::Function) -> Result<Self, String> {
         let name = String::from(function.name());
-        let mut instructions: Vec<Instruction> = Vec::new();
+        let mut body: Vec<Instruction> = Vec::new();
 
         for item in function.instructions() {
             match item {
                 parser::BlockItem::Declaration(decl) => {
                     let name = String::from(decl.name());
                     if let Some(expr) = decl.initializer() {
-                        let opr = lin_expr(expr, &mut instructions)?;
+                        let opr = lin_expr(expr, &mut body)?;
                         let dst = Operand::Variable(name);
-                        instructions.push(Instruction::Copy(opr, dst));
+                        body.push(Instruction::Copy(opr, dst));
                     }
                 }
                 parser::BlockItem::Statement(stmt) => match stmt {
                     parser::Statement::Expression(expr) => {
-                        let _ = lin_expr(expr, &mut instructions)?;
+                        let _ = lin_expr(expr, &mut body)?;
                     }
                     parser::Statement::Return(expr) => {
-                        let res = lin_expr(expr, &mut instructions)?;
-                        instructions.push(Instruction::Return(res));
+                        let res = lin_expr(expr, &mut body)?;
+                        body.push(Instruction::Return(res));
                     }
                     parser::Statement::Null => (),
                 },
             };
         }
-        match instructions.last() {
+        match body.last() {
             Some(Instruction::Return(_)) => (),
-            _ => instructions.push(Instruction::Return(Operand::Constant(0))),
+            _ => body.push(Instruction::Return(Operand::Constant(0))),
         };
-        Ok(Function(name, instructions))
+        Ok(Function(name, body))
     }
 }
 
