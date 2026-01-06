@@ -227,6 +227,8 @@ impl fmt::Display for Operator {
 /// Represents reserved keywords in the language.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Keyword {
+    If,
+    Else,
     Int,
     Void,
     Return,
@@ -244,7 +246,7 @@ impl Keyword {
     /// keyword value. Otherwise, returns `None`.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let pattern = r"^(int|void|return)\b";
+            let pattern = r"^(return|void|else|int|if)\b";
             Regex::new(pattern).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
@@ -254,6 +256,8 @@ impl Keyword {
 impl AsRef<str> for Keyword {
     fn as_ref(&self) -> &str {
         match self {
+            Self::If => "if",
+            Self::Else => "else",
             Self::Int => "int",
             Self::Void => "void",
             Self::Return => "return",
@@ -266,6 +270,8 @@ impl FromStr for Keyword {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "if" => Ok(Self::If),
+            "else" => Ok(Self::Else),
             "int" => Ok(Self::Int),
             "void" => Ok(Self::Void),
             "return" => Ok(Self::Return),
@@ -288,6 +294,8 @@ pub enum Delimiter {
     Semicolon,
     LeftBrace,
     RightBrace,
+    QuestionMark,
+    Colon,
 }
 
 impl Delimiter {
@@ -302,7 +310,7 @@ impl Delimiter {
     /// corresponding delimiter value. Otherwise, returns `None`.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let pattern = r"^[\(\);\{\}]";
+            let pattern = r"^[;:\?\(\)\{\}]";
             Regex::new(pattern).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
@@ -312,6 +320,8 @@ impl Delimiter {
 impl AsRef<str> for Delimiter {
     fn as_ref(&self) -> &str {
         match self {
+            Self::Colon => ":",
+            Self::QuestionMark => "?",
             Self::LeftParen => "(",
             Self::RightParen => ")",
             Self::Semicolon => ";",
@@ -331,6 +341,8 @@ impl FromStr for Delimiter {
             ";" => Ok(Self::Semicolon),
             "{" => Ok(Self::LeftBrace),
             "}" => Ok(Self::RightBrace),
+            "?" => Ok(Self::QuestionMark),
+            ":" => Ok(Self::Colon),
             _ => Err(format!("Unknown delimiter: {}", s)),
         }
     }
