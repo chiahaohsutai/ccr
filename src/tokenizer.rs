@@ -104,9 +104,6 @@ impl Operator {
     }
 
     /// Returns the precedence level of this operator.
-    ///
-    /// Higher values indicate higher precedence. Operators that do not participate
-    /// in expression precedence return `0`.
     fn precedence(&self) -> u64 {
         match self {
             Self::Assignment
@@ -305,15 +302,25 @@ impl Delimiter {
     }
 
     /// Attempts to match a delimiter at the start of the input string.
-    ///
-    /// If the input begins with a valid delimiter character, returns the
-    /// corresponding delimiter value. Otherwise, returns `None`.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
             let pattern = r"^[;:\?\(\)\{\}]";
             Regex::new(pattern).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
+    }
+
+    /// Returns the precedence level of this delimiter.
+    fn precedence(&self) -> u64 {
+        match self {
+            Self::QuestionMark => 3,
+            _ => 0,
+        }
+    }
+
+    /// Returns `true` if the given delimiter is a question mark.
+    fn is_eroteme(&self) -> bool {
+        matches!(self, Self::QuestionMark)
     }
 }
 
@@ -369,8 +376,6 @@ pub enum Token {
 
 impl Token {
     /// Returns `true` if this token represents a binary operator.
-    ///
-    /// Non-operator tokens and unary operators return `false`.
     pub fn is_binary_op(&self) -> bool {
         match self {
             Self::Operator(op) => op.is_binary(),
@@ -378,9 +383,15 @@ impl Token {
         }
     }
 
+    /// Returns `true` if this token represents a ternary operator.
+    pub fn is_eroteme(&self) -> bool {
+        match self {
+            Self::Delimiter(delimiter) => delimiter.is_eroteme(),
+            _ => false,
+        }
+    }
+
     /// Returns `true` if this token represents a assignment or compound assignment operator.
-    ///
-    /// Non-operator tokens return `false`.
     pub fn is_assignment_op(&self) -> bool {
         match self {
             Self::Operator(op) => op.is_assignment(),
@@ -397,20 +408,15 @@ impl Token {
     }
 
     /// Returns the precedence level of this token.
-    ///
-    /// If the token is an operator, its precedence value is returned.
-    /// Non-operator tokens have a precedence of `0`.
     pub fn precedence(&self) -> u64 {
         match self {
-            Self::Operator(op) => op.precedence(),
+            Self::Operator(operator) => operator.precedence(),
+            Self::Delimiter(delimiter) => delimiter.precedence(),
             _ => 0,
         }
     }
 
     /// Returns the length of the token's textual representation.
-    ///
-    /// The length corresponds to the number of characters consumed from
-    /// the input source when this token was lexed.
     fn len(&self) -> usize {
         match self {
             Self::Constant(c) => c.to_string().len(),
@@ -421,9 +427,6 @@ impl Token {
         }
     }
     /// Attempts to match a token at the start of the input string.
-    ///
-    /// Returns the first token whose pattern matches the beginning of `input`,
-    /// or `None` if no valid token is found.
     fn match_token(input: &str) -> Option<Self> {
         Keyword::find_match(input)
             .map(|kw| Self::Keyword(kw))
@@ -434,10 +437,6 @@ impl Token {
     }
 
     /// Attempts to match an identifier at the start of the input string.
-    ///
-    /// An identifier must begin with an alphabetic character followed by
-    /// alphanumeric characters or underscores. Returns a `Token::Identifier`
-    /// containing the matched lexeme if successful, or `None` otherwise.
     fn match_identifier(input: &str) -> Option<Token> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
             let pattern = r"^([a-zA-Z]\w*)\b";
@@ -448,9 +447,6 @@ impl Token {
     }
 
     /// Attempts to match an integer constant at the start of the input string.
-    ///
-    /// Matches a sequence of decimal digits and returns a `Token::Constant`
-    /// containing the parsed value if successful, or `None` if no match is found.
     fn match_constant(input: &str) -> Option<Token> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
             let pattern = r"^([0-9]+)\b";
@@ -474,11 +470,6 @@ impl fmt::Display for Token {
 }
 
 /// Tokenizes the input source string into a sequence of tokens.
-///
-/// Iterates through the input, skipping whitespace and repeatedly matching
-/// the longest valid token at the current position. Returns a vector of tokens
-/// in source order if successful.
-///
 /// # Errors
 /// Returns an error if no valid token can be matched at the current position,
 /// including a short preview of the unrecognized input.

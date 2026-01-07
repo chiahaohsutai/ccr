@@ -120,8 +120,6 @@ impl fmt::Display for BinaryOperator {
 }
 
 /// Represents an operand in an expression.
-///
-/// An operand may be a constant literal or a variable reference.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operand {
     Constant(u64),
@@ -169,9 +167,6 @@ impl fmt::Display for Operand {
 }
 
 /// Represents a low-level instruction in the intermediate representation.
-///
-/// Instructions operate on operands and model control flow, data movement,
-/// and arithmetic or logical operations after semantic analysis.
 pub enum Instruction {
     Return(Operand),
     Unary(UnaryOperator, Operand, Operand),
@@ -198,6 +193,7 @@ impl fmt::Display for Instruction {
     }
 }
 
+/// Linearizes the given assignment into TAC
 fn lin_assign_expr(
     lhs: parser::Expression,
     rhs: parser::Expression,
@@ -220,6 +216,7 @@ fn lin_assign_expr(
     Ok(lhs)
 }
 
+/// Linearizes the logical expression into TAC
 fn lin_log_expr(
     lhs: parser::Expression,
     rhs: parser::Expression,
@@ -258,6 +255,7 @@ fn lin_log_expr(
     Ok(dst)
 }
 
+/// Linearizes the given binary expression into TAC
 fn lin_bin_expr(
     op: parser::BinaryOperator,
     lhs: parser::Expression,
@@ -280,6 +278,7 @@ fn lin_bin_expr(
     }
 }
 
+/// Linearizes the given factor into TAC
 fn lin_factor(factor: parser::Factor, body: &mut Vec<Instruction>) -> Result<Operand, String> {
     match factor {
         parser::Factor::Int(n) => Ok(Operand::Constant(n)),
@@ -321,6 +320,7 @@ fn lin_factor(factor: parser::Factor, body: &mut Vec<Instruction>) -> Result<Ope
     }
 }
 
+/// Linearizes the given expression into TAC
 fn lin_expr(
     expression: parser::Expression,
     body: &mut Vec<Instruction>,
@@ -328,6 +328,7 @@ fn lin_expr(
     match expression {
         parser::Expression::Binary(lhs, op, rhs) => lin_bin_expr(op, *lhs, *rhs, body),
         parser::Expression::Factor(factor) => lin_factor(factor, body),
+        _ => todo!(),
     }
 }
 
@@ -383,6 +384,7 @@ impl TryFrom<parser::Function> for Function {
                         body.push(Instruction::Return(res));
                     }
                     parser::Statement::Null => (),
+                    _ => todo!(),
                 },
             };
         }

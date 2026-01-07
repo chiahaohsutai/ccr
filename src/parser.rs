@@ -160,7 +160,7 @@ impl TryFrom<tokenizer::Token> for BinaryOperator {
     fn try_from(token: tokenizer::Token) -> Result<Self, Self::Error> {
         match token {
             tokenizer::Token::Operator(operator) => Self::try_from(operator),
-            _ => Err(String::from("Token is not an operator.")),
+            token => Err(format!("Token {token} is not an operator.")),
         }
     }
 }
@@ -202,9 +202,6 @@ impl fmt::Display for BinaryOperator {
 }
 
 /// Represents the fixity of an operator.
-///
-/// Fixity describes whether an operator appears in prefix or postfix position
-/// relative to its operand.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Fixity {
     Prefix,
@@ -212,9 +209,6 @@ pub enum Fixity {
 }
 
 /// Represents a factor in an expression.
-///
-/// A factor is the smallest unit in an expression and may be a constant,
-/// identifier, unary expression, or a parenthesized subexpression.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Factor {
     Int(u64),
@@ -234,10 +228,6 @@ impl Factor {
     }
 
     /// Parses a factor from the front of the token stream.
-    ///
-    /// A factor may be a constant, identifier, unary expression, or a
-    /// parenthesized expression. Consumes the tokens required to form
-    /// the factor and returns an error if the input is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         let mut factor = match tokens.pop_front() {
             Some(tokenizer::Token::Identifier(name)) => Ok(Self::Identifier(name)),
@@ -275,10 +265,6 @@ impl Factor {
     }
 
     /// Resolves identifiers within the factor using the provided symbol table.
-    ///
-    /// Replaces identifiers with their resolved values, recursively resolving
-    /// nested expressions and unary factors. Returns an error if an identifier
-    /// is undeclared.
     fn resolve(factor: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match factor {
             Self::Identifier(identifier) => match variables.get(&identifier) {
@@ -317,12 +303,10 @@ impl fmt::Display for Factor {
 }
 
 /// Represents an expression node in the abstract syntax tree.
-///
-/// An expression may be a single factor or a binary operation composed
-/// of two subexpressions and a binary operator.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Factor(Factor),
+    Conditional(Box<Expression>, Box<Expression>, Box<Expression>),
     Binary(Box<Expression>, BinaryOperator, Box<Expression>),
 }
 
@@ -336,16 +320,12 @@ impl Expression {
     }
 
     /// Parses an expression from the token stream using precedence climbing.
-    ///
-    /// Constructs an expression tree by repeatedly parsing binary operators
-    /// according to their precedence. Tokens are consumed from the front of
-    /// the stream. Returns an error if the expression is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>, precedence: u64) -> Result<Self, String> {
         let mut lhs = Expression::Factor(Factor::parse(tokens)?);
 
         while tokens
             .front()
-            .is_some_and(|t| t.is_binary_op() && t.precedence() >= precedence)
+            .is_some_and(|t| (t.is_binary_op() || t.is_eroteme()) && t.precedence() >= precedence)
         {
             let token = tokens.pop_front().unwrap();
             let precedence = token.precedence();
@@ -356,9 +336,19 @@ impl Expression {
                     let operator = BinaryOperator::try_from(operator)?;
                     lhs = Self::Binary(Box::new(lhs), operator, Box::new(rhs));
                 }
+                tokenizer::Token::Delimiter(tokenizer::Delimiter::QuestionMark) => {
+                    let then = Box::new(Self::parse(tokens, 0)?);
+                    let next = tokens.pop_front();
+                    if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Colon)) = next {
+                        let otherwise = Box::new(Expression::parse(tokens, precedence)?);
+                        lhs = Expression::Conditional(Box::new(lhs), then, otherwise)
+                    } else {
+                        Err(format!("Expected ':' found: {next:?}"))?;
+                    }
+                }
                 _ => {
                     let rhs = Expression::parse(tokens, precedence + 1)?;
-                    let operator = BinaryOperator::try_from(token).unwrap();
+                    let operator = BinaryOperator::try_from(token)?;
                     lhs = Expression::Binary(Box::new(lhs), operator, Box::new(rhs));
                 }
             }
@@ -367,9 +357,6 @@ impl Expression {
     }
 
     /// Resolves identifiers within the expression using the provided symbol table.
-    ///
-    /// Recursively resolves all subexpressions and validates assignment targets.
-    ///
     /// # Errors
     /// Returns an error if an assignment has an invalid left-hand side or if
     /// an identifier cannot be resolved.
@@ -385,6 +372,7 @@ impl Expression {
                     Ok(Expression::Binary(lhs, operator, rhs))
                 }
             }
+            _ => todo!(),
         }
     }
 }
@@ -393,15 +381,13 @@ impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Factor(fac) => write!(f, "{fac}"),
-            Self::Binary(l, op, r) => write!(f, "{l} {op} {r}"),
+            Self::Binary(lhs, op, rhs) => write!(f, "{lhs} {op} {rhs}"),
+            Self::Conditional(cond, then, otherwise) => write!(f, "{cond} ? {then} : {otherwise}"),
         }
     }
 }
 
 /// Represents a variable declaration.
-///
-/// A declaration consists of an identifier and an optional initializer
-/// expression.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Declaration(String, Option<Expression>);
 
@@ -417,10 +403,6 @@ impl Declaration {
     }
 
     /// Resolves a variable declaration within the given symbol table.
-    ///
-    /// Assigns a unique internal name to the declared variable, inserts it
-    /// into the symbol table, and resolves the initializer expression if present.
-    /// Returns an error if the variable is declared more than once.
     fn resolve(declaration: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         if variables.contains_key(&declaration.0) {
             Err(String::from("Duplicate variable declaration"))
@@ -439,20 +421,64 @@ impl Declaration {
 }
 
 /// Represents a statement in the abstract syntax tree.
-///
-/// Statements include expression statements, return statements,
-/// and empty (null) statements.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Null,
     Return(Expression),
     Expression(Expression),
+    If(Expression, Box<Statement>, Option<Box<Statement>>),
 }
 
 impl Statement {
+    /// Parses a statement from the token stream.
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => Ok(Self::Null),
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::If)) => match tokens.pop_front() {
+                Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
+                    let expression = Expression::parse(tokens, 0)?;
+                    match tokens.pop_front() {
+                        Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
+                            let then = Box::new(Statement::parse(tokens)?);
+                            if let Some(tokenizer::Token::Keyword(tokenizer::Keyword::Else)) =
+                                tokens.front()
+                            {
+                                let _ = tokens.pop_front();
+                                let otherwise = Box::new(Statement::parse(tokens)?);
+                                Ok(Self::If(expression, then, Some(otherwise)))
+                            } else {
+                                Ok(Self::If(expression, then, None))
+                            }
+                        }
+                        token => Err(format!("Expected '(' found {token:?} instead.")),
+                    }
+                }
+                token => Err(format!("Expected '(' found {token:?} instead.")),
+            },
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Return)) => {
+                let expression = Expression::parse(tokens, 0)?;
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                        Ok(Statement::Return(expression))
+                    }
+                    _ => Err(String::from("Expected ';' after return expression.")),
+                }
+            }
+            Some(token) => {
+                tokens.push_front(token);
+                let expression = Expression::parse(tokens, 0)?;
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                        Ok(Statement::Expression(expression))
+                    }
+                    _ => Err(String::from("Expected ';' after expression statement.")),
+                }
+            }
+            None => Err(String::from("Unexpected end of input while parsing stmt.")),
+        }
+    }
+
     /// Resolves identifiers within the statement using the provided symbol table.
-    ///
-    /// Recursively resolves any expressions contained in the statement.
     fn resolve(statement: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         let stmt = match statement {
             Self::Expression(expression) => {
@@ -460,6 +486,7 @@ impl Statement {
             }
             Self::Return(expression) => Self::Return(Expression::resolve(expression, variables)?),
             Self::Null => Self::Null,
+            _ => todo!(),
         };
         Ok(stmt)
     }
@@ -469,15 +496,17 @@ impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Null => write!(f, ";"),
-            Self::Expression(expression) => write!(f, "{};", expression),
-            Self::Return(expression) => write!(f, "return {};", expression),
+            Self::Expression(expression) => write!(f, "{expression};"),
+            Self::Return(expression) => write!(f, "return {expression};"),
+            Self::If(cond, then, otherwise) => match otherwise {
+                Some(otherwise) => write!(f, "if {cond} then {then} else {otherwise}"),
+                None => write!(f, "if {cond} then {then}"),
+            },
         }
     }
 }
 
 /// Represents an item within a block.
-///
-/// A block item may be either a variable declaration or a statement.
 #[derive(Debug, Clone, PartialEq)]
 pub enum BlockItem {
     Declaration(Declaration),
@@ -486,10 +515,6 @@ pub enum BlockItem {
 
 impl BlockItem {
     /// Parses a single block item from the token stream.
-    ///
-    /// Block items include variable declarations, return statements,
-    /// expression statements, and empty statements. Consumes the tokens
-    /// required to form the item and returns an error if the input is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
@@ -517,34 +542,15 @@ impl BlockItem {
                     _ => Err(String::from("Expected ';' or '=' after variable name.")),
                 }
             }
-            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Return)) => {
-                let expression = Expression::parse(tokens, 0)?;
-                let stmt = match tokens.pop_front() {
-                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(Statement::Return(expression))
-                    }
-                    _ => Err(String::from("Expected ';' after return expression.")),
-                };
-                stmt.map(BlockItem::Statement)
-            }
             Some(token) => {
                 tokens.push_front(token);
-                let expression = Expression::parse(tokens, 0)?;
-                match tokens.pop_front() {
-                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(BlockItem::Statement(Statement::Expression(expression)))
-                    }
-                    _ => Err(String::from("Expected ';' after expression statement.")),
-                }
+                Ok(BlockItem::Statement(Statement::parse(tokens)?))
             }
             None => Err(String::from("Unexpected end of input while parsing body.")),
         }
     }
 
     /// Resolves identifiers within the block item using the provided symbol table.
-    ///
-    /// Variable declarations are registered and resolved, and statements
-    /// are recursively resolved.
     fn resolve(item: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         match item {
             Self::Declaration(declaration) => {
@@ -569,9 +575,6 @@ impl fmt::Display for BlockItem {
 }
 
 /// Represents a function definition in the abstract syntax tree.
-///
-/// A function consists of a name and a sequence of block items forming
-/// its body.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function(String, Vec<BlockItem>);
 
@@ -587,10 +590,6 @@ impl Function {
     }
 
     /// Parses a function definition from the token stream.
-    ///
-    /// Expects a function signature of the form `int <name>(void)` followed
-    /// by a block body. Consumes all tokens associated with the function and
-    /// returns an error if the definition is malformed.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
             Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
@@ -630,9 +629,6 @@ impl Function {
     }
 
     /// Resolves identifiers within the function body using the provided symbol table.
-    ///
-    /// Recursively resolves all declarations and statements contained in the
-    /// function body.
     fn resolve(function: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         let name = String::from(&function.0);
         let mut items: Vec<BlockItem> = Vec::new();
@@ -661,9 +657,6 @@ impl From<Program> for Function {
 }
 
 /// Represents a complete program.
-///
-/// A program consists of a single top-level function, which serves as
-/// the entry point of the compilation unit.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program(Function);
 
@@ -674,10 +667,6 @@ impl fmt::Display for Program {
 }
 
 /// Parses a complete program from a sequence of tokens.
-///
-/// Expects the input to contain exactly one valid function definition.
-/// Returns an error if parsing fails or if extra tokens remain after
-/// the program is parsed.
 pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
     let mut tokens: VecDeque<tokenizer::Token> = VecDeque::from(tokens);
 
@@ -692,9 +681,6 @@ pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
 }
 
 /// Validates and resolves the program's abstract syntax tree.
-///
-/// Performs identifier resolution and semantic checks, returning a
-/// transformed program with resolved symbols or an error if validation fails.
 pub fn validate(ast: Program) -> Result<Program, String> {
     let main = Function::from(ast);
     let mut vars: HashMap<String, String> = HashMap::new();
