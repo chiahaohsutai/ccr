@@ -372,7 +372,15 @@ impl Expression {
                     Ok(Expression::Binary(lhs, operator, rhs))
                 }
             }
-            _ => todo!(),
+            Self::Conditional(cond, then, otherwise) => {
+                let cond = Box::new(Self::resolve(*cond, variables)?);
+                let then = Box::new(Self::resolve(*then, variables)?);
+                Ok(Self::Conditional(
+                    cond,
+                    then,
+                    Box::new(Self::resolve(*otherwise, variables)?),
+                ))
+            }
         }
     }
 }
@@ -480,15 +488,26 @@ impl Statement {
 
     /// Resolves identifiers within the statement using the provided symbol table.
     fn resolve(statement: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
-        let stmt = match statement {
+        match statement {
             Self::Expression(expression) => {
-                Self::Expression(Expression::resolve(expression, variables)?)
+                let expression = Expression::resolve(expression, variables)?;
+                Ok(Self::Expression(expression))
             }
-            Self::Return(expression) => Self::Return(Expression::resolve(expression, variables)?),
-            Self::Null => Self::Null,
-            _ => todo!(),
-        };
-        Ok(stmt)
+            Self::Return(expression) => {
+                Ok(Self::Return(Expression::resolve(expression, variables)?))
+            }
+            Self::Null => Ok(Self::Null),
+            Self::If(cond, then, otherwise) => {
+                let cond = Expression::resolve(cond, variables)?;
+                let then = Box::new(Self::resolve(*then, variables)?);
+                if let Some(otherwise) = otherwise {
+                    let otherwise = Box::new(Self::resolve(*otherwise, variables)?);
+                    Ok(Self::If(cond, then, Some(otherwise)))
+                } else {
+                    Ok(Self::If(cond, then, None))
+                }
+            }
+        }
     }
 }
 
