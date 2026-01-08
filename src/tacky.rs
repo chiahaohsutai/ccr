@@ -328,7 +328,53 @@ fn lin_expr(
     match expression {
         parser::Expression::Binary(lhs, op, rhs) => lin_bin_expr(op, *lhs, *rhs, body),
         parser::Expression::Factor(factor) => lin_factor(factor, body),
-        _ => todo!(),
+        parser::Expression::Conditional(cond, then, otherwise) => {
+            let cond = lin_expr(*cond, body)?;
+            let dst = Operand::temp();
+            let alt = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+            let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+            body.push(Instruction::JumpIfZero(cond, alt.clone()));
+            let then = lin_expr(*then, body)?;
+            body.push(Instruction::Copy(then, dst.clone()));
+            body.push(Instruction::Jump(end.clone()));
+            body.push(Instruction::Label(alt));
+            let otherwise = lin_expr(*otherwise, body)?;
+            body.push(Instruction::Copy(otherwise, dst.clone()));
+            body.push(Instruction::Label(end));
+            Ok(dst)
+        }
+    }
+}
+
+fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result<(), String> {
+    match statement {
+        parser::Statement::Expression(expr) => {
+            let _ = lin_expr(expr, body)?;
+            Ok(())
+        }
+        parser::Statement::Return(expr) => {
+            let res = lin_expr(expr, body)?;
+            body.push(Instruction::Return(res.clone()));
+            Ok(())
+        }
+        parser::Statement::Null => Ok(()),
+        parser::Statement::If(cond, then, otherwise) => {
+            let cond = lin_expr(cond, body)?;
+            let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+            if otherwise.is_none() {
+                body.push(Instruction::JumpIfZero(cond, end.clone()));
+                let _ = lin_stmt(*then, body)?;
+            } else {
+                let alt = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+                body.push(Instruction::JumpIfZero(cond, alt.clone()));
+                let _ = lin_stmt(*then, body);
+                body.push(Instruction::Jump(end.clone()));
+                body.push(Instruction::Label(alt));
+                let _ = lin_stmt(*otherwise.unwrap(), body);
+            }
+            body.push(Instruction::Label(end));
+            Ok(())
+        }
     }
 }
 
@@ -375,17 +421,7 @@ impl TryFrom<parser::Function> for Function {
                         body.push(Instruction::Copy(opr, dst));
                     }
                 }
-                parser::BlockItem::Statement(stmt) => match stmt {
-                    parser::Statement::Expression(expr) => {
-                        let _ = lin_expr(expr, &mut body)?;
-                    }
-                    parser::Statement::Return(expr) => {
-                        let res = lin_expr(expr, &mut body)?;
-                        body.push(Instruction::Return(res));
-                    }
-                    parser::Statement::Null => (),
-                    _ => todo!(),
-                },
+                parser::BlockItem::Statement(stmt) => lin_stmt(stmt, &mut body)?,
             };
         }
         match body.last() {
