@@ -614,9 +614,24 @@ impl fmt::Display for BlockItem {
     }
 }
 
+/// Represents a scoped sequence of statements or expressions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block(Vec<BlockItem>);
+
+impl fmt::Display for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let items = self
+            .0
+            .iter()
+            .map(|i| format!("{}", i))
+            .collect::<Vec<String>>();
+        write!(f, "{}", items.join("\n"))
+    }
+}
+
 /// Represents a function definition in the abstract syntax tree.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Function(String, Vec<BlockItem>);
+pub struct Function(String, Block);
 
 impl Function {
     /// Returns the function name.
@@ -626,7 +641,7 @@ impl Function {
 
     /// Returns the sequence of block items that make up the function body.
     pub fn instructions(self) -> Vec<BlockItem> {
-        self.1
+        self.1.0
     }
 
     /// Parses a function definition from the token stream.
@@ -652,7 +667,7 @@ impl Function {
                                 )) = tokens.front()
                                 {
                                     tokens.pop_front();
-                                    break Ok(Function(name, block));
+                                    break Ok(Function(name, Block(block)));
                                 }
                                 let item = BlockItem::parse(tokens)?;
                                 block.push(item);
@@ -672,21 +687,16 @@ impl Function {
     fn resolve(function: Self, variables: &mut HashMap<String, String>) -> Result<Self, String> {
         let name = String::from(&function.0);
         let mut items: Vec<BlockItem> = Vec::new();
-        for item in function.1 {
+        for item in function.1.0 {
             items.push(BlockItem::resolve(item, variables)?);
         }
-        Ok(Function(name, items))
+        Ok(Function(name, Block(items)))
     }
 }
 
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let body = self
-            .1
-            .iter()
-            .map(|i| format!("\t{}", i))
-            .collect::<Vec<String>>();
-        write!(f, "FN {}\n{}\nEND FN {}", self.0, body.join("\n"), self.0)
+        write!(f, "FN {}\n{}\nEND FN {}", self.0, self.1, self.0)
     }
 }
 
