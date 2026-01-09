@@ -437,6 +437,7 @@ pub enum Statement {
     If(Expression, Box<Statement>, Option<Box<Statement>>),
     Goto(String),
     Label(String, Box<Statement>),
+    Compound(Block),
 }
 
 impl Statement {
@@ -491,13 +492,18 @@ impl Statement {
                 Ok(Self::Label(ident, Box::new(stmt)))
             }
             Some(token) => {
-                tokens.push_front(token);
-                let expression = Expression::parse(tokens, 0)?;
-                match tokens.pop_front() {
-                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(Statement::Expression(expression))
+                if let tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace) = token {
+                    tokens.push_front(token);
+                    Ok(Self::Compound(Block::parse(tokens)?))
+                } else {
+                    tokens.push_front(token);
+                    let expression = Expression::parse(tokens, 0)?;
+                    match tokens.pop_front() {
+                        Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                            Ok(Statement::Expression(expression))
+                        }
+                        _ => Err(String::from("Expected ';' after expression statement.")),
                     }
-                    _ => Err(String::from("Expected ';' after expression statement.")),
                 }
             }
             None => Err(String::from("Unexpected end of input while parsing stmt.")),
@@ -542,6 +548,7 @@ impl fmt::Display for Statement {
             },
             Self::Goto(label) => write!(f, "goto {label}"),
             Self::Label(label, stmt) => write!(f, "{label}: {stmt}"),
+            Self::Compound(block) => write!(f, "{block}"),
         }
     }
 }
@@ -618,6 +625,27 @@ impl fmt::Display for BlockItem {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block(Vec<BlockItem>);
 
+impl Block {
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace)) => {
+                let mut block: Vec<BlockItem> = Vec::new();
+                loop {
+                    if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightBrace)) =
+                        tokens.front()
+                    {
+                        tokens.pop_front();
+                        break Ok(Self(block));
+                    }
+                    let item = BlockItem::parse(tokens)?;
+                    block.push(item);
+                }
+            }
+            _ => Err(String::from("Expected '{' at the start of fn body.")),
+        }
+    }
+}
+
 impl fmt::Display for Block {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let items = self
@@ -658,23 +686,7 @@ impl Function {
                         Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)),
                         Some(tokenizer::Token::Keyword(tokenizer::Keyword::Void)),
                         Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)),
-                    ) => match tokens.pop_front() {
-                        Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace)) => {
-                            let mut block: Vec<BlockItem> = Vec::new();
-                            loop {
-                                if let Some(tokenizer::Token::Delimiter(
-                                    tokenizer::Delimiter::RightBrace,
-                                )) = tokens.front()
-                                {
-                                    tokens.pop_front();
-                                    break Ok(Function(name, Block(block)));
-                                }
-                                let item = BlockItem::parse(tokens)?;
-                                block.push(item);
-                            }
-                        }
-                        _ => Err(String::from("Expected '{' at the start of fn body.")),
-                    },
+                    ) => Ok(Function(name, Block::parse(tokens)?)),
                     _ => Err(String::from("Expected '(void)' after fn name.")),
                 }
             }
