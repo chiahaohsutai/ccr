@@ -435,6 +435,8 @@ pub enum Statement {
     Return(Expression),
     Expression(Expression),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
+    Goto(String),
+    Label(String, Box<Statement>),
 }
 
 impl Statement {
@@ -472,6 +474,22 @@ impl Statement {
                     _ => Err(String::from("Expected ';' after return expression.")),
                 }
             }
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Goto)) => match tokens.pop_front() {
+                Some(tokenizer::Token::Identifier(ident)) => match tokens.pop_front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                        Ok(Self::Goto(ident))
+                    }
+                    tok => Err(format!("Expected ';' after statament found: {tok:?}")),
+                },
+                tok => Err(format!("Expected label found: {tok:?}")),
+            },
+            Some(tokenizer::Token::Identifier(ident))
+                if tokens.front().is_some_and(|t| t.is_colon()) =>
+            {
+                let _ = tokens.pop_front();
+                let stmt = Self::parse(tokens)?;
+                Ok(Self::Label(ident, Box::new(stmt)))
+            }
             Some(token) => {
                 tokens.push_front(token);
                 let expression = Expression::parse(tokens, 0)?;
@@ -507,6 +525,7 @@ impl Statement {
                     Ok(Self::If(cond, then, None))
                 }
             }
+            _ => todo!(),
         }
     }
 }
@@ -521,6 +540,8 @@ impl fmt::Display for Statement {
                 Some(otherwise) => write!(f, "if {cond} then {then} else {otherwise}"),
                 None => write!(f, "if {cond} then {then}"),
             },
+            Self::Goto(label) => write!(f, "goto {label}"),
+            Self::Label(label, stmt) => write!(f, "{label}: {stmt}"),
         }
     }
 }

@@ -402,6 +402,14 @@ impl Token {
         }
     }
 
+    /// Returns `true` if this token represents a colon.
+    pub fn is_colon(&self) -> bool {
+        match self {
+            Self::Delimiter(Delimiter::Colon) => true,
+            _ => false,
+        }
+    }
+
     /// Returns `true` if this token represents an increment or decrement operator.
     pub fn is_incr_or_decr_op(&self) -> bool {
         match self {
