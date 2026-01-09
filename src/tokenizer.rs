@@ -229,6 +229,7 @@ pub enum Keyword {
     Int,
     Void,
     Return,
+    Goto,
 }
 
 impl Keyword {
@@ -243,7 +244,7 @@ impl Keyword {
     /// keyword value. Otherwise, returns `None`.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let pattern = r"^(return|void|else|int|if)\b";
+            let pattern = r"^(return|void|else|goto|int|if)\b";
             Regex::new(pattern).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
@@ -258,6 +259,7 @@ impl AsRef<str> for Keyword {
             Self::Int => "int",
             Self::Void => "void",
             Self::Return => "return",
+            Self::Goto => "goto",
         }
     }
 }
@@ -272,6 +274,7 @@ impl FromStr for Keyword {
             "int" => Ok(Self::Int),
             "void" => Ok(Self::Void),
             "return" => Ok(Self::Return),
+            "goto" => Ok(Self::Goto),
             _ => Err(format!("Unknown keyword: {}", s)),
         }
     }
@@ -439,7 +442,7 @@ impl Token {
     /// Attempts to match an identifier at the start of the input string.
     fn match_identifier(input: &str) -> Option<Token> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let pattern = r"^([a-zA-Z]\w*)\b";
+            let pattern = r"^([a-zA-Z_]\w*)\b";
             Regex::new(pattern).unwrap()
         });
         RE.find(input)
