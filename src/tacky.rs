@@ -375,6 +375,14 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             body.push(Instruction::Label(end));
             Ok(())
         }
+        parser::Statement::Goto(label) => {
+            body.push(Instruction::Jump(label));
+            Ok(())
+        }
+        parser::Statement::Label(label, stmt) => {
+            body.push(Instruction::Label(label));
+            lin_stmt(*stmt, body)
+        }
         _ => todo!(),
     }
 }
