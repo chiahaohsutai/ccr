@@ -638,6 +638,11 @@ impl fmt::Display for BlockItem {
 pub struct Block(Vec<BlockItem>);
 
 impl Block {
+    /// Consumes the block and returns its items.
+    pub fn items(self) -> Vec<BlockItem> {
+        self.0
+    }
+
     /// Parses a sequence block item from the token stream.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {

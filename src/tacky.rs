@@ -383,7 +383,27 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             body.push(Instruction::Label(label));
             lin_stmt(*stmt, body)
         }
-        _ => todo!(),
+        parser::Statement::Compound(block) => {
+            for item in block.items() {
+                lin_block_item(item, body)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn lin_block_item(item: parser::BlockItem, body: &mut Vec<Instruction>) -> Result<(), String> {
+    match item {
+        parser::BlockItem::Declaration(decl) => {
+            let name = String::from(decl.name());
+            if let Some(expr) = decl.initializer() {
+                let opr = lin_expr(expr, body)?;
+                let dst = Operand::Variable(name);
+                body.push(Instruction::Copy(opr, dst));
+            };
+            Ok(())
+        }
+        parser::BlockItem::Statement(stmt) => lin_stmt(stmt, body),
     }
 }
 
