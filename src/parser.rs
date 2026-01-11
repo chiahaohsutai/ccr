@@ -1,6 +1,6 @@
 use core::fmt;
 use std::borrow::Borrow;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
 use nanoid::nanoid;
@@ -267,18 +267,18 @@ impl Factor {
     }
 
     /// Resolves identifiers within the factor using the provided symbol table.
-    fn resolve(factor: Self, variables: &mut Environment<String, String>) -> Result<Self, String> {
+    fn resolve(factor: Self, env: &mut Environment) -> Result<Self, String> {
         match factor {
-            Self::Identifier(identifier) => match variables.get(&identifier) {
+            Self::Identifier(identifier) => match env.variables.find(&identifier) {
                 Some(ident) => Ok(Self::Identifier(String::from(ident))),
                 None => Err(String::from("Undeclared variable")),
             },
             Self::Expression(expression) => {
-                let expression = Box::new(Expression::resolve(*expression, variables)?);
+                let expression = Box::new(Expression::resolve(*expression, env)?);
                 Ok(Self::Expression(expression))
             }
             Self::Unary(operator, fixity, factor) => {
-                let factor = Factor::resolve(*factor, variables)?;
+                let factor = Factor::resolve(*factor, env)?;
                 if operator.is_incr_or_decr() && !factor.is_ident() {
                     Err(String::from("Invalid operand in unary operation"))
                 } else {
@@ -362,28 +362,25 @@ impl Expression {
     /// # Errors
     /// Returns an error if an assignment has an invalid left-hand side or if
     /// an identifier cannot be resolved.
-    fn resolve(
-        expression: Self,
-        variables: &mut Environment<String, String>,
-    ) -> Result<Self, String> {
+    fn resolve(expression: Self, env: &mut Environment) -> Result<Self, String> {
         match expression {
-            Self::Factor(factor) => Ok(Self::Factor(Factor::resolve(factor, variables)?)),
+            Self::Factor(factor) => Ok(Self::Factor(Factor::resolve(factor, env)?)),
             Self::Binary(lhs, operator, rhs) => {
                 if operator.is_assignment() && !lhs.is_ident() {
                     Err(format!("Invalid lvalue in assignment: {lhs}"))
                 } else {
-                    let lhs = Box::new(Expression::resolve(*lhs, variables)?);
-                    let rhs = Box::new(Expression::resolve(*rhs, variables)?);
+                    let lhs = Box::new(Expression::resolve(*lhs, env)?);
+                    let rhs = Box::new(Expression::resolve(*rhs, env)?);
                     Ok(Expression::Binary(lhs, operator, rhs))
                 }
             }
             Self::Conditional(cond, then, otherwise) => {
-                let cond = Box::new(Self::resolve(*cond, variables)?);
-                let then = Box::new(Self::resolve(*then, variables)?);
+                let cond = Box::new(Self::resolve(*cond, env)?);
+                let then = Box::new(Self::resolve(*then, env)?);
                 Ok(Self::Conditional(
                     cond,
                     then,
-                    Box::new(Self::resolve(*otherwise, variables)?),
+                    Box::new(Self::resolve(*otherwise, env)?),
                 ))
             }
         }
@@ -416,16 +413,16 @@ impl Declaration {
     }
 
     /// Resolves a variable declaration within the given symbol table.
-    fn resolve(
-        declaration: Self,
-        variables: &mut Environment<String, String>,
-    ) -> Result<Self, String> {
+    fn resolve(declaration: Self, env: &mut Environment) -> Result<Self, String> {
         let id = nanoid!(21, ALPHANUMERIC);
         let name = format!("var.{}.{id}", &declaration.0);
 
-        if let None = variables.insert(String::from(&declaration.0), String::from(&name)) {
+        if let None = env
+            .variables
+            .insert(String::from(&declaration.0), String::from(&name))
+        {
             if let Some(expr) = declaration.1 {
-                let initializer = Expression::resolve(expr, variables)?;
+                let initializer = Expression::resolve(expr, env)?;
                 Ok(Declaration(name, Some(initializer)))
             } else {
                 Ok(Declaration(name, None))
@@ -519,30 +516,34 @@ impl Statement {
     }
 
     /// Resolves identifiers within the statement using the provided symbol table.
-    fn resolve(
-        statement: Self,
-        variables: &mut Environment<String, String>,
-    ) -> Result<Self, String> {
+    fn resolve(statement: Self, env: &mut Environment) -> Result<Self, String> {
         match statement {
             Self::Expression(expression) => {
-                let expression = Expression::resolve(expression, variables)?;
+                let expression = Expression::resolve(expression, env)?;
                 Ok(Self::Expression(expression))
             }
-            Self::Return(expression) => {
-                Ok(Self::Return(Expression::resolve(expression, variables)?))
-            }
+            Self::Return(expression) => Ok(Self::Return(Expression::resolve(expression, env)?)),
             Self::Null => Ok(Self::Null),
             Self::If(cond, then, otherwise) => {
-                let cond = Expression::resolve(cond, variables)?;
-                let then = Box::new(Self::resolve(*then, variables)?);
+                let cond = Expression::resolve(cond, env)?;
+                let then = Box::new(Self::resolve(*then, env)?);
                 if let Some(otherwise) = otherwise {
-                    let otherwise = Box::new(Self::resolve(*otherwise, variables)?);
+                    let otherwise = Box::new(Self::resolve(*otherwise, env)?);
                     Ok(Self::If(cond, then, Some(otherwise)))
                 } else {
                     Ok(Self::If(cond, then, None))
                 }
             }
-            _ => todo!(),
+            Self::Goto(label) => Ok(Self::Goto(label)),
+            Self::Label(label, stmt) => {
+                if env.labels.insert(label.clone()) {
+                    let stmt = Self::resolve(*stmt, env)?;
+                    Ok(Self::Label(label, Box::new(stmt)))
+                } else {
+                    Err(format!("Duplicate goto lable found: {label}"))
+                }
+            }
+            Self::Compound(block) => Ok(Self::Compound(Block::resolve(block, env)?)),
         }
     }
 }
@@ -609,14 +610,14 @@ impl BlockItem {
     }
 
     /// Resolves identifiers within the block item using the provided symbol table.
-    fn resolve(item: Self, variables: &mut Environment<String, String>) -> Result<Self, String> {
+    fn resolve(item: Self, env: &mut Environment) -> Result<Self, String> {
         match item {
             Self::Declaration(declaration) => {
-                let declaration = Declaration::resolve(declaration, variables)?;
+                let declaration = Declaration::resolve(declaration, env)?;
                 Ok(Self::Declaration(declaration))
             }
             Self::Statement(stmt) => {
-                let statement = Statement::resolve(stmt, variables)?;
+                let statement = Statement::resolve(stmt, env)?;
                 Ok(BlockItem::Statement(statement))
             }
         }
@@ -655,6 +656,16 @@ impl Block {
             }
             _ => Err(String::from("Expected '{' at the start of fn body.")),
         }
+    }
+
+    fn resolve(block: Self, env: &mut Environment) -> Result<Self, String> {
+        let mut items: Vec<BlockItem> = Vec::new();
+        env.variables.enter();
+        for item in block.0 {
+            items.push(BlockItem::resolve(item, env)?);
+        }
+        env.variables.exit();
+        Ok(Block(items))
     }
 }
 
@@ -708,16 +719,17 @@ impl Function {
     }
 
     /// Resolves identifiers within the function body using the provided symbol table.
-    fn resolve(
-        function: Self,
-        variables: &mut Environment<String, String>,
-    ) -> Result<Self, String> {
+    fn resolve(function: Self, env: &mut Environment) -> Result<Self, String> {
         let name = String::from(&function.0);
-        let mut items: Vec<BlockItem> = Vec::new();
-        for item in function.1.0 {
-            items.push(BlockItem::resolve(item, variables)?);
+        let block = Block::resolve(function.1, env)?;
+        for item in block.0.iter() {
+            if let BlockItem::Statement(Statement::Goto(label)) = item {
+                if env.labels.get(label).is_none() {
+                    return Err(format!("Goto label not defined: {label}"));
+                }
+            }
         }
-        Ok(Function(name, Block(items)))
+        Ok(Function(name, block))
     }
 }
 
@@ -757,19 +769,15 @@ pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
     }
 }
 
-struct Environment<K, V> {
-    variables: Vec<HashMap<K, V>>,
-}
+struct VarMap<K, V>(Vec<HashMap<K, V>>);
 
-impl<K, V> Environment<K, V>
+impl<K, V> VarMap<K, V>
 where
     K: Eq + Hash,
 {
     /// Creates a new environment initialized with a single global scope.
     fn new() -> Self {
-        Self {
-            variables: vec![HashMap::new()],
-        }
+        Self(vec![HashMap::new()])
     }
 
     /// Looks up `k` from the innermost scope outward, returning the first match.
@@ -778,7 +786,7 @@ where
         K: Borrow<Q>,
         Q: Hash + Eq,
     {
-        for env in self.variables.iter().rev() {
+        for env in self.0.iter().rev() {
             if let Some(v) = env.get(k) {
                 return Some(v);
             }
@@ -786,35 +794,72 @@ where
         None
     }
 
-    /// Returns the value for `k` from the current scope, if present.
-    fn get<Q: ?Sized>(&self, k: &Q) -> Option<&V>
-    where
-        K: Borrow<Q>,
-        Q: Hash + Eq,
-    {
-        self.variables.last().map(|map| map.get(k)).flatten()
-    }
-
     /// Inserts `k -> v` into the current  scope and returns the old value if it existed.
     fn insert(&mut self, k: K, v: V) -> Option<V>
     where
         K: Eq + Hash,
     {
-        self.variables
-            .last_mut()
-            .map(|map| map.insert(k, v))
-            .flatten()
+        self.0.last_mut().map(|map| map.insert(k, v)).flatten()
+    }
+
+    /// Enters a new (nested) scope by pushing an empty scope frame onto the environment.
+    fn enter(&mut self) {
+        self.0.push(HashMap::new());
     }
 
     /// Pops (exits) the current scope, discarding all bindings declared in it.
     fn exit(&mut self) {
-        let _ = self.variables.pop();
+        let _ = self.0.pop();
+    }
+}
+
+struct LabelMap<K>(HashSet<K>);
+
+impl<K> LabelMap<K>
+where
+    K: Eq + Hash,
+{
+    /// Creates an empty label set.
+    fn new() -> Self {
+        Self(HashSet::new())
+    }
+
+    /// Returns a reference to the stored label equal to `k`, if present.
+    fn get<Q: ?Sized>(&self, k: &Q) -> Option<&K>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        self.0.get(k)
+    }
+
+    /// Inserts `k` into the label set and returns `true` if it was newly added.
+    fn insert(&mut self, k: K) -> bool
+    where
+        K: Eq + Hash,
+    {
+        self.0.insert(k)
+    }
+}
+
+struct Environment {
+    variables: VarMap<String, String>,
+    labels: LabelMap<String>,
+}
+
+impl Environment {
+    /// Creates a new environment with empty variable scopes and an empty label set.
+    fn new() -> Self {
+        Self {
+            variables: VarMap::new(),
+            labels: LabelMap::new(),
+        }
     }
 }
 
 /// Validates and resolves the program's abstract syntax tree.
 pub fn validate(ast: Program) -> Result<Program, String> {
     let main = Function::from(ast);
-    let mut variables: Environment<String, String> = Environment::new();
+    let mut variables: Environment = Environment::new();
     Ok(Program(Function::resolve(main, &mut variables)?))
 }
