@@ -412,6 +412,35 @@ impl Declaration {
         self.1
     }
 
+    /// Parses a declaration
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
+                let name = match tokens.pop_front() {
+                    Some(tokenizer::Token::Identifier(identifier)) => Ok(identifier),
+                    None => Err(String::from("Unexpected end of input.")),
+                    _ => Err(String::from("Expected identifier after 'int'.")),
+                }?;
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                        Ok(Self(name, None))
+                    }
+                    Some(tokenizer::Token::Operator(tokenizer::Operator::Assignment)) => {
+                        let expr = Expression::parse(tokens, 0)?;
+                        match tokens.pop_front() {
+                            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                                Ok(Self(name, Some(expr)))
+                            }
+                            tok => Err(format!("Expected ';' after declaration, found: {tok:?}")),
+                        }
+                    }
+                    _ => Err(String::from("Expected ';' or '=' after variable name.")),
+                }
+            }
+            tok => Err(format!("Expected 'int' found: {tok:?}")),
+        }
+    }
+
     /// Resolves a variable declaration within the given symbol table.
     fn resolve(declaration: Self, env: &mut Environment) -> Result<Self, String> {
         let id = nanoid!(21, ALPHANUMERIC);
@@ -433,6 +462,30 @@ impl Declaration {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ForInit {
+    InitDecl(Declaration),
+    InitExpr(Expression),
+}
+
+impl ForInit {
+    // Parses the for loop initializer header
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.front() {
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
+                Ok(Self::InitDecl(Declaration::parse(tokens)?))
+            }
+            _ => {
+                let init = Self::InitExpr(Expression::parse(tokens, 0)?);
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => Ok(init),
+                    tok => Err(format!("Expected ';' found: {tok:?}")),
+                }
+            }
+        }
+    }
+}
+
 /// Represents a statement in the abstract syntax tree.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -443,58 +496,200 @@ pub enum Statement {
     Goto(String),
     Label(String, Box<Statement>),
     Compound(Block),
+    Break(String),
+    Continue(String),
+    While(Expression, Box<Statement>, String),
+    DoWhile(Box<Statement>, Expression, String),
+    For(
+        Option<ForInit>,
+        Option<Expression>,
+        Option<Expression>,
+        Box<Statement>,
+        String,
+    ),
 }
 
 impl Statement {
+    fn parse_if(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
+                let expression = Expression::parse(tokens, 0)?;
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
+                        let then = Box::new(Statement::parse(tokens)?);
+                        if let Some(tokenizer::Token::Keyword(tokenizer::Keyword::Else)) =
+                            tokens.front()
+                        {
+                            let _ = tokens.pop_front();
+                            let otherwise = Box::new(Statement::parse(tokens)?);
+                            Ok(Self::If(expression, then, Some(otherwise)))
+                        } else {
+                            Ok(Self::If(expression, then, None))
+                        }
+                    }
+                    tok => Err(format!("Expected '(' found {tok:?} instead.")),
+                }
+            }
+            tok => Err(format!("Expected '(' found {tok:?} instead.")),
+        }
+    }
+
+    fn parse_return(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        let expression = Expression::parse(tokens, 0)?;
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                Ok(Statement::Return(expression))
+            }
+            _ => Err(String::from("Expected ';' after return expression.")),
+        }
+    }
+
+    fn parse_goto(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Identifier(ident)) => match tokens.pop_front() {
+                Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                    Ok(Self::Goto(ident))
+                }
+                tok => Err(format!("Expected ';' after statament found: {tok:?}")),
+            },
+            tok => Err(format!("Expected label found: {tok:?}")),
+        }
+    }
+
+    fn parse_break(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                Ok(Self::Break(String::new()))
+            }
+            tok => Err(format!("Expected ';' found: {tok:?}")),
+        }
+    }
+
+    fn parse_continue(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                Ok(Self::Break(String::new()))
+            }
+            tok => Err(format!("Expected ';' found: {tok:?}")),
+        }
+    }
+
+    fn parse_while(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
+                let cond = Expression::parse(tokens, 0)?;
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
+                        let body = Self::parse(tokens)?;
+                        let label = format!("loop.{}", nanoid!(21));
+                        Ok(Self::While(cond, Box::new(body), label))
+                    }
+                    tok => Err(format!("Expected ')' found {tok:?}")),
+                }
+            }
+            tok => Err(format!("Expected '(' found {tok:?}")),
+        }
+    }
+
+    fn parse_dowhile(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        let body = Self::parse(tokens)?;
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::While)) => {
+                match tokens.pop_front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
+                        let cond = Expression::parse(tokens, 0)?;
+                        match tokens.pop_front() {
+                            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
+                                match tokens.pop_front() {
+                                    Some(tokenizer::Token::Delimiter(
+                                        tokenizer::Delimiter::Semicolon,
+                                    )) => {
+                                        let label = format!("loop.{}", nanoid!(21));
+                                        Ok(Self::DoWhile(Box::new(body), cond, label))
+                                    }
+                                    tok => Err(format!("Expected ';' found: {tok:?}")),
+                                }
+                            }
+                            tok => Err(format!("Expected ')' found {tok:?}")),
+                        }
+                    }
+                    tok => Err(format!("Expected '(' found {tok:?}")),
+                }
+            }
+            tok => Err(format!("Expected 'while' found: {tok:?}")),
+        }
+    }
+
+    fn parse_for(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
+                let init = match tokens.front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                        let _ = tokens.pop_front();
+                        None
+                    }
+                    _ => Some(ForInit::parse(tokens)?),
+                };
+                let cond = match tokens.front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                        let _ = tokens.pop_front();
+                        None
+                    }
+                    _ => {
+                        let cond = Expression::parse(tokens, 0)?;
+                        match tokens.pop_front() {
+                            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+                                Some(cond)
+                            }
+                            tok => Err(format!("Expected ';' found: {tok:?}, {tokens:?}"))?,
+                        }
+                    }
+                };
+                let post = match tokens.front() {
+                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
+                        let _ = tokens.pop_front();
+                        None
+                    }
+                    _ => {
+                        let post = Expression::parse(tokens, 0)?;
+                        match tokens.pop_front() {
+                            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
+                                Some(post)
+                            }
+                            tok => Err(format!("Expected ')' found: {tok:?}, {tokens:?}"))?,
+                        }
+                    }
+                };
+                let body = Box::new(Self::parse(tokens)?);
+                let label = format!("loop.{}", nanoid!(21));
+                Ok(Self::For(init, cond, post, body, label))
+            }
+            tok => Err(format!("Expected '(' found: {tok:?}, {tokens:?}")),
+        }
+    }
+
     /// Parses a statement from the token stream.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => Ok(Self::Null),
-            Some(tokenizer::Token::Keyword(tokenizer::Keyword::If)) => match tokens.pop_front() {
-                Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
-                    let expression = Expression::parse(tokens, 0)?;
-                    match tokens.pop_front() {
-                        Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
-                            let then = Box::new(Statement::parse(tokens)?);
-                            if let Some(tokenizer::Token::Keyword(tokenizer::Keyword::Else)) =
-                                tokens.front()
-                            {
-                                let _ = tokens.pop_front();
-                                let otherwise = Box::new(Statement::parse(tokens)?);
-                                Ok(Self::If(expression, then, Some(otherwise)))
-                            } else {
-                                Ok(Self::If(expression, then, None))
-                            }
-                        }
-                        token => Err(format!("Expected '(' found {token:?} instead.")),
-                    }
-                }
-                token => Err(format!("Expected '(' found {token:?} instead.")),
-            },
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::If)) => Self::parse_if(tokens),
             Some(tokenizer::Token::Keyword(tokenizer::Keyword::Return)) => {
-                let expression = Expression::parse(tokens, 0)?;
-                match tokens.pop_front() {
-                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(Statement::Return(expression))
-                    }
-                    _ => Err(String::from("Expected ';' after return expression.")),
-                }
+                Self::parse_return(tokens)
             }
-            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Goto)) => match tokens.pop_front() {
-                Some(tokenizer::Token::Identifier(ident)) => match tokens.pop_front() {
-                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(Self::Goto(ident))
-                    }
-                    tok => Err(format!("Expected ';' after statament found: {tok:?}")),
-                },
-                tok => Err(format!("Expected label found: {tok:?}")),
-            },
-            Some(tokenizer::Token::Identifier(ident))
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Goto)) => Self::parse_goto(tokens),
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Break)) => Self::parse_break(tokens),
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::While)) => Self::parse_while(tokens),
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Do)) => Self::parse_dowhile(tokens),
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Continue)) => {
+                Self::parse_continue(tokens)
+            }
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::For)) => Self::parse_for(tokens),
+            Some(tokenizer::Token::Identifier(i))
                 if tokens.front().is_some_and(|t| t.is_colon()) =>
             {
                 let _ = tokens.pop_front();
                 let stmt = Self::parse(tokens)?;
-                Ok(Self::Label(ident, Box::new(stmt)))
+                Ok(Self::Label(i, Box::new(stmt)))
             }
             Some(token) => {
                 if let tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace) = token {
@@ -544,6 +739,7 @@ impl Statement {
                 }
             }
             Self::Compound(block) => Ok(Self::Compound(Block::resolve(block, env)?)),
+            _ => todo!(),
         }
     }
 }
@@ -561,6 +757,13 @@ impl fmt::Display for Statement {
             Self::Goto(label) => write!(f, "goto {label}"),
             Self::Label(label, stmt) => write!(f, "{label}: {stmt}"),
             Self::Compound(block) => write!(f, "{block}"),
+            Self::Break(_) => write!(f, "break"),
+            Self::Continue(_) => write!(f, "continue"),
+            Self::While(cond, stmt, _) => write!(f, "while {cond}\n{stmt}"),
+            Self::DoWhile(stmt, cond, _) => write!(f, "do\n{stmt}\nwhile {cond}"),
+            Self::For(init, cond, post, stmt, _) => {
+                write!(f, "for {init:?} | {cond:?} | {post:?}\n{stmt}")
+            }
         }
     }
 }
@@ -575,36 +778,11 @@ pub enum BlockItem {
 impl BlockItem {
     /// Parses a single block item from the token stream.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
-        match tokens.pop_front() {
-            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                Ok(Self::Statement(Statement::Null))
-            }
+        match tokens.front() {
             Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
-                let name = match tokens.pop_front() {
-                    Some(tokenizer::Token::Identifier(identifier)) => Ok(identifier),
-                    None => Err(String::from("Unexpected end of input.")),
-                    _ => Err(String::from("Expected identifier after 'int'.")),
-                }?;
-                match tokens.pop_front() {
-                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(Self::Declaration(Declaration(name, None)))
-                    }
-                    Some(tokenizer::Token::Operator(tokenizer::Operator::Assignment)) => {
-                        let expr = Expression::parse(tokens, 0)?;
-                        match tokens.pop_front() {
-                            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                                Ok(Self::Declaration(Declaration(name, Some(expr))))
-                            }
-                            tok => Err(format!("Expected ';' after declaration, found: {tok:?}")),
-                        }
-                    }
-                    _ => Err(String::from("Expected ';' or '=' after variable name.")),
-                }
+                Ok(Self::Declaration(Declaration::parse(tokens)?))
             }
-            Some(token) => {
-                tokens.push_front(token);
-                Ok(BlockItem::Statement(Statement::parse(tokens)?))
-            }
+            Some(_) => Ok(BlockItem::Statement(Statement::parse(tokens)?)),
             None => Err(String::from("Unexpected end of input while parsing body.")),
         }
     }

@@ -389,6 +389,7 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             }
             Ok(())
         }
+        _ => todo!(),
     }
 }
 
