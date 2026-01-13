@@ -230,6 +230,11 @@ pub enum Keyword {
     Void,
     Return,
     Goto,
+    Do,
+    While,
+    For,
+    Break,
+    Continue,
 }
 
 impl Keyword {
@@ -244,7 +249,7 @@ impl Keyword {
     /// keyword value. Otherwise, returns `None`.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let pattern = r"^(return|void|else|goto|int|if)\b";
+            let pattern = r"^(continue|return|while|break|void|else|goto|for|int|if|do)\b";
             Regex::new(pattern).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
@@ -260,6 +265,11 @@ impl AsRef<str> for Keyword {
             Self::Void => "void",
             Self::Return => "return",
             Self::Goto => "goto",
+            Self::Do => "do",
+            Self::While => "while",
+            Self::For => "for",
+            Self::Break => "break",
+            Self::Continue => "continue",
         }
     }
 }
@@ -275,6 +285,11 @@ impl FromStr for Keyword {
             "void" => Ok(Self::Void),
             "return" => Ok(Self::Return),
             "goto" => Ok(Self::Goto),
+            "do" => Ok(Self::Do),
+            "while" => Ok(Self::While),
+            "for" => Ok(Self::For),
+            "break" => Ok(Self::Break),
+            "continue" => Ok(Self::Continue),
             _ => Err(format!("Unknown keyword: {}", s)),
         }
     }
