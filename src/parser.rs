@@ -484,6 +484,13 @@ impl ForInit {
             }
         }
     }
+
+    fn resolve(init: Self, env: &mut Environment) -> Result<Self, String> {
+        match init {
+            Self::InitDecl(decl) => Ok(Self::InitDecl(Declaration::resolve(decl, env)?)),
+            Self::InitExpr(expr) => Ok(Self::InitExpr(Expression::resolve(expr, env)?)),
+        }
+    }
 }
 
 /// Represents a statement in the abstract syntax tree.
@@ -739,7 +746,35 @@ impl Statement {
                 }
             }
             Self::Compound(block) => Ok(Self::Compound(Block::resolve(block, env)?)),
-            _ => todo!(),
+            Self::While(cond, body, label) => {
+                let cond = Expression::resolve(cond, env)?;
+                let body = Statement::resolve(*body, env)?;
+                Ok(Self::While(cond, Box::new(body), label))
+            }
+            Self::DoWhile(body, cond, label) => {
+                let body = Self::resolve(*body, env)?;
+                let cond = Expression::resolve(cond, env)?;
+                Ok(Self::DoWhile(Box::new(body), cond, label))
+            }
+            Self::For(init, cond, post, body, label) => {
+                env.variables.enter();
+                let init = match init {
+                    Some(init) => Some(ForInit::resolve(init, env)?),
+                    None => None,
+                };
+                let cond = match cond {
+                    Some(cond) => Some(Expression::resolve(cond, env)?),
+                    None => None,
+                };
+                let post = match post {
+                    Some(post) => Some(Expression::resolve(post, env)?),
+                    None => None,
+                };
+                let body = Self::resolve(*body, env)?;
+                Ok(Self::For(init, cond, post, Box::new(body), label))
+            }
+            Self::Break(label) => Ok(Self::Break(label)),
+            Self::Continue(label) => Ok(Self::Continue(label)),
         }
     }
 }
