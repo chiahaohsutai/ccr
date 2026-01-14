@@ -747,17 +747,22 @@ impl Statement {
             }
             Self::Compound(block) => Ok(Self::Compound(Block::resolve(block, env)?)),
             Self::While(cond, body, label) => {
+                env.loops.push_back(label.clone());
                 let cond = Expression::resolve(cond, env)?;
                 let body = Statement::resolve(*body, env)?;
+                let _ = env.loops.pop_back();
                 Ok(Self::While(cond, Box::new(body), label))
             }
             Self::DoWhile(body, cond, label) => {
+                env.loops.push_back(label.clone());
                 let body = Self::resolve(*body, env)?;
                 let cond = Expression::resolve(cond, env)?;
+                let _ = env.loops.pop_back();
                 Ok(Self::DoWhile(Box::new(body), cond, label))
             }
             Self::For(init, cond, post, body, label) => {
                 env.variables.enter();
+                env.loops.push_back(label.clone());
                 let init = match init {
                     Some(init) => Some(ForInit::resolve(init, env)?),
                     None => None,
@@ -771,10 +776,17 @@ impl Statement {
                     None => None,
                 };
                 let body = Self::resolve(*body, env)?;
+                let _ = env.loops.pop_back();
                 Ok(Self::For(init, cond, post, Box::new(body), label))
             }
-            Self::Break(label) => Ok(Self::Break(label)),
-            Self::Continue(label) => Ok(Self::Continue(label)),
+            Self::Break(_) => match env.loops.back() {
+                Some(label) => Ok(Self::Break(String::from(label))),
+                _ => Err(String::from("Break statement outside loop.")),
+            },
+            Self::Continue(_) => match env.loops.back() {
+                Some(label) => Ok(Self::Continue(String::from(label))),
+                _ => Err(String::from("Continue statement outside loop")),
+            },
         }
     }
 }
@@ -1063,6 +1075,7 @@ where
 struct Environment {
     variables: VarMap<String, String>,
     labels: LabelMap<String>,
+    loops: VecDeque<String>,
 }
 
 impl Environment {
@@ -1071,6 +1084,7 @@ impl Environment {
         Self {
             variables: VarMap::new(),
             labels: LabelMap::new(),
+            loops: VecDeque::new(),
         }
     }
 }
