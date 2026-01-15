@@ -421,22 +421,47 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             Ok(())
         }
         parser::Statement::For(init, cond, post, bd, label) => {
-            todo!()
+            let break_label = format!("label.break.{label}");
+            let start = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+            if let Some(init) = init {
+                match init {
+                    parser::ForInit::InitDecl(decl) => lin_decl(decl, body),
+                    parser::ForInit::InitExpr(expr) => {
+                        let _ = lin_expr(expr, body)?;
+                        Ok(())
+                    }
+                }?;
+            };
+            body.push(Instruction::Label(start.clone()));
+            if let Some(cond) = cond {
+                let op = lin_expr(cond, body)?;
+                body.push(Instruction::JumpIfZero(op, break_label.clone()));
+            }
+            lin_stmt(*bd, body)?;
+            body.push(Instruction::Label(format!("label.continue.{label}")));
+            if let Some(post) = post {
+                let _ = lin_expr(post, body)?;
+            }
+            body.push(Instruction::Jump(start));
+            body.push(Instruction::Label(break_label));
+            Ok(())
         }
     }
 }
 
+fn lin_decl(decl: parser::Declaration, body: &mut Vec<Instruction>) -> Result<(), String> {
+    let name = String::from(decl.name());
+    if let Some(expr) = decl.initializer() {
+        let opr = lin_expr(expr, body)?;
+        let dst = Operand::Variable(name);
+        body.push(Instruction::Copy(opr, dst));
+    };
+    Ok(())
+}
+
 fn lin_block_item(item: parser::BlockItem, body: &mut Vec<Instruction>) -> Result<(), String> {
     match item {
-        parser::BlockItem::Declaration(decl) => {
-            let name = String::from(decl.name());
-            if let Some(expr) = decl.initializer() {
-                let opr = lin_expr(expr, body)?;
-                let dst = Operand::Variable(name);
-                body.push(Instruction::Copy(opr, dst));
-            };
-            Ok(())
-        }
+        parser::BlockItem::Declaration(decl) => lin_decl(decl, body),
         parser::BlockItem::Statement(stmt) => lin_stmt(stmt, body),
     }
 }
