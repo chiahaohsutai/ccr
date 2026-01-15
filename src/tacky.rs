@@ -128,7 +128,7 @@ pub enum Operand {
 
 impl Operand {
     fn temp() -> Self {
-        Self::Variable(nanoid!(21, ALPHANUMERIC))
+        Self::Variable(format!("temp.{}", nanoid!(21, ALPHANUMERIC)))
     }
 }
 
@@ -394,11 +394,11 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             Ok(())
         }
         parser::Statement::Continue(label) => {
-            body.push(Instruction::Label(format!("label.continue.{label}")));
+            body.push(Instruction::Jump(format!("label.continue.{label}")));
             Ok(())
         }
         parser::Statement::DoWhile(bd, cond, label) => {
-            let start = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+            let start = format!("label.loop.start.{}", nanoid!(21, ALPHANUMERIC));
             let continue_label = format!("label.continue.{}", label);
             body.push(Instruction::Label(start.clone()));
             lin_stmt(*bd, body)?;
@@ -422,7 +422,7 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
         }
         parser::Statement::For(init, cond, post, bd, label) => {
             let break_label = format!("label.break.{label}");
-            let start = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+            let start = format!("label.loop.start.{}", nanoid!(21, ALPHANUMERIC));
             if let Some(init) = init {
                 match init {
                     parser::ForInit::InitDecl(decl) => lin_decl(decl, body),
