@@ -6,7 +6,7 @@ This project presents a full implementation of the compiler described in the tex
 
 1. **Lexing (Tokenization)** – Converts the input source code into a stream of tokens.
 2. **Parsing** – Builds an abstract syntax tree (AST) using recursive descent with precedence climbing.
-3. **Semantic Aanlysis** – Validates that the AST is semantically correct.
+3. **Semantic Aanlysis** – Validates that the AST is semantically correct (variable resolution, loop labeling, type checking).
 4. **Tacky (Three-Address Code)** – Linearizes the AST into a sequence of simple instructions using three-address code (TAC).
 5. **Code Generation** – Translates TAC instructions into target assembly code.
 6. **Linking** – Assembles and links the generated assembly into a native executable.
