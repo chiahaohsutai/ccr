@@ -776,6 +776,7 @@ impl Statement {
                     None => None,
                 };
                 let body = Self::resolve(*body, env)?;
+                env.variables.exit();
                 let _ = env.loops.pop_back();
                 Ok(Self::For(init, cond, post, Box::new(body), label))
             }
