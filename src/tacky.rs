@@ -396,10 +396,19 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             lin_stmt(*bd, body)?;
             body.push(Instruction::Label(continue_label));
             let op = lin_expr(cond, body)?;
-            let temp = Operand::temp();
-            body.push(Instruction::Copy(op, temp.clone()));
-            body.push(Instruction::JumpIfNotZero(temp, start));
-            let break_label = format!("label.continue.{}", label);
+            body.push(Instruction::JumpIfNotZero(op, start));
+            let break_label = format!("label.break.{}", label);
+            body.push(Instruction::Label(break_label));
+            Ok(())
+        }
+        parser::Statement::While(cond, bd, label) => {
+            let continue_label = format!("label.continue.{}", label);
+            let break_label = format!("label.break.{}", label);
+            body.push(Instruction::Label(continue_label.clone()));
+            let op = lin_expr(cond, body)?;
+            body.push(Instruction::JumpIfZero(op, break_label.clone()));
+            lin_stmt(*bd, body)?;
+            body.push(Instruction::Jump(continue_label));
             body.push(Instruction::Label(break_label));
             Ok(())
         }
