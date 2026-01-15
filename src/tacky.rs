@@ -389,6 +389,14 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             }
             Ok(())
         }
+        parser::Statement::Break(label) => {
+            body.push(Instruction::Jump(format!("label.break.{label}")));
+            Ok(())
+        }
+        parser::Statement::Continue(label) => {
+            body.push(Instruction::Label(format!("label.continue.{label}")));
+            Ok(())
+        }
         parser::Statement::DoWhile(bd, cond, label) => {
             let start = format!("label.{}", nanoid!(21, ALPHANUMERIC));
             let continue_label = format!("label.continue.{}", label);
@@ -412,7 +420,9 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             body.push(Instruction::Label(break_label));
             Ok(())
         }
-        _ => todo!(),
+        parser::Statement::For(init, cond, post, bd, label) => {
+            todo!()
+        }
     }
 }
 
