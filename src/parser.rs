@@ -588,7 +588,7 @@ impl Statement {
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
                         let body = Self::parse(tokens)?;
-                        let label = format!("loop.{}", nanoid!(21));
+                        let label = format!("loop.{}", nanoid!(21, ALPHANUMERIC));
                         Ok(Self::While(cond, Box::new(body), label))
                     }
                     tok => Err(format!("Expected ')' found {tok:?}")),
@@ -611,7 +611,7 @@ impl Statement {
                                     Some(tokenizer::Token::Delimiter(
                                         tokenizer::Delimiter::Semicolon,
                                     )) => {
-                                        let label = format!("loop.{}", nanoid!(21));
+                                        let label = format!("loop.{}", nanoid!(21, ALPHANUMERIC));
                                         Ok(Self::DoWhile(Box::new(body), cond, label))
                                     }
                                     tok => Err(format!("Expected ';' found: {tok:?}")),
@@ -668,7 +668,7 @@ impl Statement {
                     }
                 };
                 let body = Box::new(Self::parse(tokens)?);
-                let label = format!("loop.{}", nanoid!(21));
+                let label = format!("loop.{}", nanoid!(21, ALPHANUMERIC));
                 Ok(Self::For(init, cond, post, body, label))
             }
             tok => Err(format!("Expected '(' found: {tok:?}, {tokens:?}")),
