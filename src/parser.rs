@@ -575,7 +575,7 @@ impl Statement {
     fn parse_continue(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                Ok(Self::Break(String::new()))
+                Ok(Self::Continue(String::new()))
             }
             tok => Err(format!("Expected ';' found: {tok:?}")),
         }
