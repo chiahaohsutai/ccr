@@ -493,6 +493,41 @@ impl ForInit {
     }
 }
 
+/// Represents the body of a switch case.
+#[derive(Debug, Clone, PartialEq)]
+enum SwitchCaseBody {
+    Block(Block),
+    Body(Vec<BlockItem>),
+}
+
+impl fmt::Display for SwitchCaseBody {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Block(block) => write!(f, "{block}"),
+            Self::Body(items) => {
+                let items: Vec<String> = items.iter().map(|i| i.to_string()).collect();
+                write!(f, "{}", items.join("\n"))
+            }
+        }
+    }
+}
+
+/// Represents a switch statment case.
+#[derive(Debug, Clone, PartialEq)]
+enum SwitchCase {
+    Default(SwitchCaseBody),
+    Case(Expression, SwitchCaseBody),
+}
+
+impl fmt::Display for SwitchCase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Default(body) => write!(f, "default:\n{body}"),
+            Self::Case(case, body) => write!(f, "case {case}:\n{body}"),
+        }
+    }
+}
+
 /// Represents a statement in the abstract syntax tree.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
@@ -507,6 +542,7 @@ pub enum Statement {
     Continue(String),
     While(Expression, Box<Statement>, String),
     DoWhile(Box<Statement>, Expression, String),
+    Switch(Expression, Vec<SwitchCase>),
     For(
         Option<ForInit>,
         Option<Expression>,
@@ -788,6 +824,7 @@ impl Statement {
                 Some(label) => Ok(Self::Continue(String::from(label))),
                 _ => Err(String::from("Continue statement outside loop")),
             },
+            _ => todo!(),
         }
     }
 }
@@ -811,6 +848,10 @@ impl fmt::Display for Statement {
             Self::DoWhile(stmt, cond, _) => write!(f, "do\n{stmt}\nwhile {cond}"),
             Self::For(init, cond, post, stmt, _) => {
                 write!(f, "for {init:?} | {cond:?} | {post:?}\n{stmt}")
+            }
+            Self::Switch(value, cases) => {
+                let cases: Vec<String> = cases.iter().map(|c| c.to_string()).collect();
+                write!(f, "switch ({value}):\n{}", cases.join("\n"))
             }
         }
     }

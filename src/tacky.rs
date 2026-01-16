@@ -446,6 +446,7 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             body.push(Instruction::Label(break_label));
             Ok(())
         }
+        _ => todo!(),
     }
 }
 
