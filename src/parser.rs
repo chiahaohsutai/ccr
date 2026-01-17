@@ -604,7 +604,7 @@ pub enum Statement {
     Continue(String),
     While(Expression, Box<Statement>, String),
     DoWhile(Box<Statement>, Expression, String),
-    Switch(Expression, Vec<SwitchCase>),
+    Switch(Expression, Option<Vec<SwitchCase>>),
     For(
         Option<ForInit>,
         Option<Expression>,
@@ -779,9 +779,10 @@ impl Statement {
                 let expr = Expression::parse(tokens, 0)?;
                 let next = tokens.pop_front();
                 if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) = next {
-                    let next = tokens.pop_front();
-                    if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace)) = next
+                    if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace)) =
+                        tokens.front()
                     {
+                        let _ = tokens.pop_front();
                         let mut cases: Vec<SwitchCase> = Vec::new();
                         loop {
                             if let Some(tokenizer::Token::Delimiter(
@@ -789,13 +790,28 @@ impl Statement {
                             )) = tokens.front()
                             {
                                 let _ = tokens.pop_front();
-                                break Ok(Self::Switch(expr, cases));
-                            }
+                                if cases.len() > 0 {
+                                    break Ok(Self::Switch(expr, Some(cases)));
+                                } else {
+                                    break Ok(Self::Switch(expr, None));
+                                }
+                            };
                             let case = SwitchCase::parse(tokens)?;
                             cases.push(case);
                         }
                     } else {
-                        Err(format!("Expected '{{' found: {next:?}, {tokens:?}"))
+                        if tokens.front().is_some_and(|t| {
+                            matches!(
+                                t,
+                                tokenizer::Token::Keyword(tokenizer::Keyword::Case)
+                                    | tokenizer::Token::Keyword(tokenizer::Keyword::Default)
+                            )
+                        }) {
+                            let case = SwitchCase::parse(tokens)?;
+                            Ok(Self::Switch(expr, Some(vec![case])))
+                        } else {
+                            Ok(Self::Switch(expr, None))
+                        }
                     }
                 } else {
                     Err(format!("Expected ')' found: {next:?}, {tokens:?}"))
@@ -947,8 +963,17 @@ impl fmt::Display for Statement {
                 write!(f, "for {init:?} | {cond:?} | {post:?}\n{stmt}")
             }
             Self::Switch(value, cases) => {
-                let cases: Vec<String> = cases.iter().map(|c| c.to_string()).collect();
-                write!(f, "switch ({value}):\n{}", cases.join("\n"))
+                if cases.is_some() {
+                    let cases: Vec<String> = cases
+                        .as_ref()
+                        .unwrap()
+                        .iter()
+                        .map(|c| c.to_string())
+                        .collect();
+                    write!(f, "switch ({value}):\n{}", cases.join("\n"))
+                } else {
+                    write!(f, "switch ({value})")
+                }
             }
         }
     }
