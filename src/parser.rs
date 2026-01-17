@@ -574,7 +574,9 @@ impl SwitchCase {
                     Err(format!("Expected ':' found: {next:?}, {tokens:?}"))
                 }
             }
-            tok => Err(format!("Expected 'case' or 'default' found: {tok:?}")),
+            tok => Err(format!(
+                "Expected 'case' or 'default' found: {tok:?}, {tokens:?}"
+            )),
         }
     }
 }
@@ -782,11 +784,11 @@ impl Statement {
                     {
                         let mut cases: Vec<SwitchCase> = Vec::new();
                         loop {
-                            let next = tokens.pop_front();
                             if let Some(tokenizer::Token::Delimiter(
                                 tokenizer::Delimiter::RightBrace,
-                            )) = next
+                            )) = tokens.front()
                             {
+                                let _ = tokens.pop_front();
                                 break Ok(Self::Switch(expr, cases));
                             }
                             let case = SwitchCase::parse(tokens)?;
