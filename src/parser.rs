@@ -495,9 +495,35 @@ impl ForInit {
 
 /// Represents the body of a switch case.
 #[derive(Debug, Clone, PartialEq)]
-enum SwitchCaseBody {
+pub enum SwitchCaseBody {
     Block(Block),
     Body(Vec<BlockItem>),
+}
+
+fn is_switch_case_end(token: &tokenizer::Token) -> bool {
+    matches!(
+        token,
+        tokenizer::Token::Keyword(tokenizer::Keyword::Case)
+            | tokenizer::Token::Keyword(tokenizer::Keyword::Default)
+            | tokenizer::Token::Delimiter(tokenizer::Delimiter::RightBrace)
+    )
+}
+
+impl SwitchCaseBody {
+    /// Parses a switch case body.
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace)) = tokens.front() {
+            let body = Block::parse(tokens)?;
+            Ok(Self::Block(body))
+        } else {
+            let mut items: Vec<BlockItem> = Vec::new();
+            while tokens.front().is_some_and(|t| !is_switch_case_end(t)) {
+                let item = BlockItem::parse(tokens)?;
+                items.push(item);
+            }
+            Ok(Self::Body(items))
+        }
+    }
 }
 
 impl fmt::Display for SwitchCaseBody {
@@ -514,16 +540,50 @@ impl fmt::Display for SwitchCaseBody {
 
 /// Represents a switch statment case.
 #[derive(Debug, Clone, PartialEq)]
-enum SwitchCase {
-    Default(SwitchCaseBody),
-    Case(Expression, SwitchCaseBody),
+pub enum SwitchCase {
+    Default(Option<SwitchCaseBody>),
+    Case(Expression, Option<SwitchCaseBody>),
+}
+
+impl SwitchCase {
+    /// Parses a switch statament case
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Case)) => {
+                let expr = Expression::parse(tokens, 0)?;
+                let next = tokens.pop_front();
+                if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Colon)) = next {
+                    let body = SwitchCaseBody::parse(tokens)?;
+                    match body {
+                        SwitchCaseBody::Body(b) if b.len() == 0 => Ok(Self::Case(expr, None)),
+                        _ => Ok(Self::Case(expr, Some(body))),
+                    }
+                } else {
+                    Err(format!("Expected ':' found: {next:?}, {tokens:?}"))
+                }
+            }
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Default)) => {
+                let next = tokens.pop_front();
+                if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Colon)) = next {
+                    let body = SwitchCaseBody::parse(tokens)?;
+                    match body {
+                        SwitchCaseBody::Body(b) if b.len() == 0 => Ok(Self::Default(None)),
+                        _ => Ok(Self::Default(Some(body))),
+                    }
+                } else {
+                    Err(format!("Expected ':' found: {next:?}, {tokens:?}"))
+                }
+            }
+            tok => Err(format!("Expected 'case' or 'default' found: {tok:?}")),
+        }
+    }
 }
 
 impl fmt::Display for SwitchCase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Default(body) => write!(f, "default:\n{body}"),
-            Self::Case(case, body) => write!(f, "case {case}:\n{body}"),
+            Self::Default(body) => write!(f, "default:\n{body:?}"),
+            Self::Case(case, body) => write!(f, "case {case}:\n{body:?}"),
         }
     }
 }
@@ -711,6 +771,38 @@ impl Statement {
         }
     }
 
+    fn parse_switch(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        match tokens.pop_front() {
+            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)) => {
+                let expr = Expression::parse(tokens, 0)?;
+                let next = tokens.pop_front();
+                if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) = next {
+                    let next = tokens.pop_front();
+                    if let Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace)) = next
+                    {
+                        let mut cases: Vec<SwitchCase> = Vec::new();
+                        loop {
+                            let next = tokens.pop_front();
+                            if let Some(tokenizer::Token::Delimiter(
+                                tokenizer::Delimiter::RightBrace,
+                            )) = next
+                            {
+                                break Ok(Self::Switch(expr, cases));
+                            }
+                            let case = SwitchCase::parse(tokens)?;
+                            cases.push(case);
+                        }
+                    } else {
+                        Err(format!("Expected '{{' found: {next:?}, {tokens:?}"))
+                    }
+                } else {
+                    Err(format!("Expected ')' found: {next:?}, {tokens:?}"))
+                }
+            }
+            tok => Err(format!("Expected '(' found: {tok:?}, {tokens:?}")),
+        }
+    }
+
     /// Parses a statement from the token stream.
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
         match tokens.pop_front() {
@@ -733,6 +825,9 @@ impl Statement {
                 let _ = tokens.pop_front();
                 let stmt = Self::parse(tokens)?;
                 Ok(Self::Label(i, Box::new(stmt)))
+            }
+            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Switch)) => {
+                Self::parse_switch(tokens)
             }
             Some(token) => {
                 if let tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftBrace) = token {
