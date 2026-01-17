@@ -507,9 +507,9 @@ pub enum Statement {
     Continue(String),
     While(Expression, Box<Self>, String),
     DoWhile(Box<Self>, Expression, String),
-    Switch(Expression, Box<Self>),
-    Case(Expression, Box<Self>),
-    Default(Box<Self>),
+    Switch(Expression, Box<Self>, String),
+    Case(Expression, Box<Self>, String),
+    Default(Box<Self>, String),
     For(
         Option<ForInit>,
         Option<Expression>,
@@ -708,7 +708,8 @@ impl Statement {
                         match tokens.pop_front() {
                             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
                                 let stmt = Self::parse(tokens)?;
-                                Ok(Self::Switch(expr, Box::new(stmt)))
+                                let label = format!("switch.{}", nanoid!(21, ALPHANUMERIC));
+                                Ok(Self::Switch(expr, Box::new(stmt), label))
                             }
                             tok => Err(format!("Expect ')' found: {tok:?}, {tokens:?}")),
                         }
@@ -721,7 +722,7 @@ impl Statement {
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Colon)) => {
                         let stmt = Self::parse(tokens)?;
-                        Ok(Self::Case(expr, Box::new(stmt)))
+                        Ok(Self::Case(expr, Box::new(stmt), String::from("")))
                     }
                     tok => Err(format!("Expected ':' found {tok:?}, {tokens:?}")),
                 }
@@ -730,7 +731,7 @@ impl Statement {
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Colon)) => {
                         let stmt = Self::parse(tokens)?;
-                        Ok(Self::Default(Box::new(stmt)))
+                        Ok(Self::Default(Box::new(stmt), String::from("")))
                     }
                     tok => Err(format!("Expected ':' found {tok:?}, {tokens:?}")),
                 }
@@ -850,9 +851,9 @@ impl fmt::Display for Statement {
             Self::For(init, cond, post, stmt, _) => {
                 write!(f, "for {init:?} | {cond:?} | {post:?}\n{stmt}")
             }
-            Self::Switch(expr, stmt) => write!(f, "switch ({expr}) {stmt}"),
-            Self::Case(expr, stmt) => write!(f, "case {expr}: {stmt}"),
-            Self::Default(stmt) => write!(f, "default: {stmt}"),
+            Self::Switch(expr, stmt, _) => write!(f, "switch ({expr}) {stmt}"),
+            Self::Case(expr, stmt, _) => write!(f, "case {expr}: {stmt}"),
+            Self::Default(stmt, _) => write!(f, "default: {stmt}"),
         }
     }
 }
