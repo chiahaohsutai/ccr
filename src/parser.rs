@@ -780,27 +780,27 @@ impl Statement {
                     let stmt = Self::resolve(*stmt, env)?;
                     Ok(Self::Label(label, Box::new(stmt)))
                 } else {
-                    Err(format!("Duplicate goto lable found: {label}"))
+                    Err(format!("Duplicate goto label found: {label}"))
                 }
             }
             Self::Compound(block) => Ok(Self::Compound(Block::resolve(block, env)?)),
             Self::While(cond, body, label) => {
-                env.loops.push_back(label.clone());
+                env.scopes.push_back(Scope::Loop(label.clone()));
                 let cond = Expression::resolve(cond, env)?;
                 let body = Statement::resolve(*body, env)?;
-                let _ = env.loops.pop_back();
+                let _ = env.scopes.pop_back();
                 Ok(Self::While(cond, Box::new(body), label))
             }
             Self::DoWhile(body, cond, label) => {
-                env.loops.push_back(label.clone());
+                env.scopes.push_back(Scope::Loop(label.clone()));
                 let body = Self::resolve(*body, env)?;
                 let cond = Expression::resolve(cond, env)?;
-                let _ = env.loops.pop_back();
+                let _ = env.scopes.pop_back();
                 Ok(Self::DoWhile(Box::new(body), cond, label))
             }
             Self::For(init, cond, post, body, label) => {
                 env.variables.enter();
-                env.loops.push_back(label.clone());
+                env.scopes.push_back(Scope::Loop(label.clone()));
                 let init = match init {
                     Some(init) => Some(ForInit::resolve(init, env)?),
                     None => None,
@@ -815,18 +815,76 @@ impl Statement {
                 };
                 let body = Self::resolve(*body, env)?;
                 env.variables.exit();
-                let _ = env.loops.pop_back();
+                let _ = env.scopes.pop_back();
                 Ok(Self::For(init, cond, post, Box::new(body), label))
             }
-            Self::Break(_) => match env.loops.back() {
+            Self::Break(_) => match env.scopes.back() {
                 Some(label) => Ok(Self::Break(String::from(label))),
                 _ => Err(String::from("Break statement outside loop.")),
             },
-            Self::Continue(_) => match env.loops.back() {
-                Some(label) => Ok(Self::Continue(String::from(label))),
-                _ => Err(String::from("Continue statement outside loop")),
-            },
-            _ => todo!(),
+            Self::Continue(_) => {
+                let scope = env.current_loop();
+                if let None = scope {
+                    return Err(String::from("Continue statement outside loop"));
+                }
+                let label = String::from(scope.unwrap());
+                Ok(Self::Continue(String::from(label)))
+            }
+            Self::Switch(expr, stmt, label) => {
+                let scope = Scope::Switch(String::from(&label), false);
+                env.scopes.push_back(scope);
+                let expr = Expression::resolve(expr, env)?;
+                let stmt = Self::resolve(*stmt, env)?;
+                let _ = env.scopes.pop_back();
+                Ok(Self::Switch(expr, Box::new(stmt), label))
+            }
+            Self::Case(expr, stmt, _) => {
+                let scope = env.current_switch();
+                if let None = scope {
+                    return Err(String::from("Case statement outside switch block"));
+                }
+                let label = String::from(scope.unwrap());
+                let expr = Expression::resolve(expr, env)?;
+                if let Expression::Factor(Factor::Int(_)) = expr {
+                    let stmt = Self::resolve(*stmt, env)?;
+                    Ok(Self::Case(expr, Box::new(stmt), label))
+                } else {
+                    Err(String::from("Found non-integer case."))
+                }
+            }
+            Self::Default(stmt, _) => {
+                let scope = env.current_switch();
+                if let None = scope {
+                    return Err(String::from("Default statement outside switch block"));
+                } else if let Some(Scope::Switch(_, true)) = scope {
+                    return Err(String::from("Duplicate default statment"));
+                }
+                let scope = scope.unwrap();
+                let label = String::from(scope);
+                let idx = env.current_switch_index().unwrap();
+                env.scopes.insert(idx, Scope::Switch(label.clone(), true));
+                env.scopes.remove(idx + 1);
+                let stmt = Self::resolve(*stmt, env)?;
+                Ok(Self::Default(Box::new(stmt), label))
+            }
+        }
+    }
+
+    fn resolve_labels(stmt: &Self, env: &Environment) -> Result<(), String> {
+        match stmt {
+            Self::Goto(label) if env.labels.get(label).is_none() => {
+                Err(String::from("Undefined label."))
+            }
+            Self::Compound(block) => Block::resolve_labels(block, env),
+            Self::Switch(_, stmt, _)
+            | Self::Default(stmt, _)
+            | Self::Case(_, stmt, _)
+            | Self::If(_, stmt, _)
+            | Self::Label(_, stmt)
+            | Self::While(_, stmt, _)
+            | Self::DoWhile(stmt, _, _)
+            | Self::For(_, _, _, stmt, _) => Self::resolve_labels(&stmt, env),
+            _ => Ok(()),
         }
     }
 }
@@ -846,10 +904,10 @@ impl fmt::Display for Statement {
             Self::Compound(block) => write!(f, "{block}"),
             Self::Break(_) => write!(f, "break"),
             Self::Continue(_) => write!(f, "continue"),
-            Self::While(cond, stmt, _) => write!(f, "while {cond}\n{stmt}"),
-            Self::DoWhile(stmt, cond, _) => write!(f, "do\n{stmt}\nwhile {cond}"),
+            Self::While(cond, stmt, _) => write!(f, "while {cond} {stmt}"),
+            Self::DoWhile(stmt, cond, _) => write!(f, "do {stmt} while {cond}"),
             Self::For(init, cond, post, stmt, _) => {
-                write!(f, "for {init:?} | {cond:?} | {post:?}\n{stmt}")
+                write!(f, "for {init:?} | {cond:?} | {post:?} {stmt}")
             }
             Self::Switch(expr, stmt, _) => write!(f, "switch ({expr}) {stmt}"),
             Self::Case(expr, stmt, _) => write!(f, "case {expr}: {stmt}"),
@@ -940,6 +998,15 @@ impl Block {
         env.variables.exit();
         Ok(Block(items))
     }
+
+    fn resolve_labels(block: &Self, env: &Environment) -> Result<(), String> {
+        for item in block.0.iter() {
+            if let BlockItem::Statement(stmt) = item {
+                Statement::resolve_labels(stmt, env)?;
+            };
+        }
+        Ok(())
+    }
 }
 
 impl fmt::Display for Block {
@@ -995,13 +1062,7 @@ impl Function {
     fn resolve(function: Self, env: &mut Environment) -> Result<Self, String> {
         let name = String::from(&function.0);
         let block = Block::resolve(function.1, env)?;
-        for item in block.0.iter() {
-            if let BlockItem::Statement(Statement::Goto(label)) = item {
-                if env.labels.get(label).is_none() {
-                    return Err(format!("Goto label not defined: {label}"));
-                }
-            }
-        }
+        Block::resolve_labels(&block, env)?;
         Ok(Function(name, block))
     }
 }
@@ -1042,6 +1103,7 @@ pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
     }
 }
 
+#[derive(Debug)]
 struct VarMap<K, V>(Vec<HashMap<K, V>>);
 
 impl<K, V> VarMap<K, V>
@@ -1086,6 +1148,7 @@ where
     }
 }
 
+#[derive(Debug)]
 struct LabelMap<K>(HashSet<K>);
 
 impl<K> LabelMap<K>
@@ -1115,10 +1178,26 @@ where
     }
 }
 
+#[derive(Debug)]
+enum Scope {
+    Loop(String),
+    Switch(String, bool),
+}
+
+impl From<&Scope> for String {
+    fn from(value: &Scope) -> Self {
+        match value {
+            Scope::Loop(v) => String::from(v),
+            Scope::Switch(v, _) => String::from(v),
+        }
+    }
+}
+
+#[derive(Debug)]
 struct Environment {
     variables: VarMap<String, String>,
     labels: LabelMap<String>,
-    loops: VecDeque<String>,
+    scopes: VecDeque<Scope>,
 }
 
 impl Environment {
@@ -1127,8 +1206,30 @@ impl Environment {
         Self {
             variables: VarMap::new(),
             labels: LabelMap::new(),
-            loops: VecDeque::new(),
+            scopes: VecDeque::new(),
         }
+    }
+
+    fn current_loop(&self) -> Option<&Scope> {
+        self.scopes
+            .iter()
+            .rev()
+            .find(|s| matches!(s, Scope::Loop(_)))
+    }
+
+    fn current_switch(&mut self) -> Option<&Scope> {
+        self.scopes
+            .iter()
+            .rev()
+            .find(|s| matches!(s, Scope::Switch(..)))
+    }
+
+    fn current_switch_index(&self) -> Option<usize> {
+        self.scopes
+            .iter()
+            .rev()
+            .position(|s| matches!(s, Scope::Switch(..)))
+            .map(|i| self.scopes.len() - 1 - i)
     }
 }
 
