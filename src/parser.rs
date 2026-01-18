@@ -831,11 +831,13 @@ impl Statement {
                 Ok(Self::Continue(String::from(label)))
             }
             Self::Switch(expr, stmt, label) => {
-                let scope = Scope::Switch(String::from(&label), false);
+                let scope = Scope::Switch(String::from(&label));
                 env.scopes.push_back(scope);
+                env.cases.push_back(HashSet::new());
                 let expr = Expression::resolve(expr, env)?;
                 let stmt = Self::resolve(*stmt, env)?;
                 let _ = env.scopes.pop_back();
+                let _ = env.cases.pop_back();
                 Ok(Self::Switch(expr, Box::new(stmt), label))
             }
             Self::Case(expr, stmt, _) => {
@@ -845,9 +847,17 @@ impl Statement {
                 }
                 let label = String::from(scope.unwrap());
                 let expr = Expression::resolve(expr, env)?;
-                if let Expression::Factor(Factor::Int(_)) = expr {
-                    let stmt = Self::resolve(*stmt, env)?;
-                    Ok(Self::Case(expr, Box::new(stmt), label))
+
+                let cases = env.cases.back_mut().unwrap();
+                if let Expression::Factor(Factor::Int(value)) = expr {
+                    let case = value.to_string();
+                    if cases.get(&case).is_none() {
+                        cases.insert(case);
+                        let stmt = Self::resolve(*stmt, env)?;
+                        Ok(Self::Case(expr, Box::new(stmt), label))
+                    } else {
+                        Err(String::from("Found duplicate case."))
+                    }
                 } else {
                     Err(String::from("Found non-integer case."))
                 }
@@ -856,16 +866,17 @@ impl Statement {
                 let scope = env.current_switch();
                 if let None = scope {
                     return Err(String::from("Default statement outside switch block"));
-                } else if let Some(Scope::Switch(_, true)) = scope {
-                    return Err(String::from("Duplicate default statment"));
                 }
                 let scope = scope.unwrap();
                 let label = String::from(scope);
-                let idx = env.current_switch_index().unwrap();
-                env.scopes.insert(idx, Scope::Switch(label.clone(), true));
-                env.scopes.remove(idx + 1);
-                let stmt = Self::resolve(*stmt, env)?;
-                Ok(Self::Default(Box::new(stmt), label))
+                let cases = env.cases.back_mut().unwrap();
+                if cases.get("default").is_none() {
+                    cases.insert(String::from("default"));
+                    let stmt = Self::resolve(*stmt, env)?;
+                    Ok(Self::Default(Box::new(stmt), label))
+                } else {
+                    Err(String::from("Found duplicate default case."))
+                }
             }
         }
     }
@@ -1181,14 +1192,14 @@ where
 #[derive(Debug)]
 enum Scope {
     Loop(String),
-    Switch(String, bool),
+    Switch(String),
 }
 
 impl From<&Scope> for String {
     fn from(value: &Scope) -> Self {
         match value {
             Scope::Loop(v) => String::from(v),
-            Scope::Switch(v, _) => String::from(v),
+            Scope::Switch(v) => String::from(v),
         }
     }
 }
@@ -1198,6 +1209,7 @@ struct Environment {
     variables: VarMap<String, String>,
     labels: LabelMap<String>,
     scopes: VecDeque<Scope>,
+    cases: VecDeque<HashSet<String>>,
 }
 
 impl Environment {
@@ -1207,6 +1219,7 @@ impl Environment {
             variables: VarMap::new(),
             labels: LabelMap::new(),
             scopes: VecDeque::new(),
+            cases: VecDeque::new(),
         }
     }
 
@@ -1222,14 +1235,6 @@ impl Environment {
             .iter()
             .rev()
             .find(|s| matches!(s, Scope::Switch(..)))
-    }
-
-    fn current_switch_index(&self) -> Option<usize> {
-        self.scopes
-            .iter()
-            .rev()
-            .position(|s| matches!(s, Scope::Switch(..)))
-            .map(|i| self.scopes.len() - 1 - i)
     }
 }
 
