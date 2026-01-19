@@ -507,7 +507,13 @@ pub enum Statement {
     Continue(String),
     While(Expression, Box<Self>, String),
     DoWhile(Box<Self>, Expression, String),
-    Switch(Expression, Box<Self>, String, Vec<(Option<u64>, String)>),
+    Switch(
+        Expression,
+        Box<Self>,
+        String,
+        Vec<(Option<u64>, String)>,
+        Option<String>,
+    ),
     Case(Expression, Box<Self>, String),
     Default(Box<Self>, String),
     For(
@@ -709,7 +715,7 @@ impl Statement {
                             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
                                 let stmt = Self::parse(tokens)?;
                                 let label = format!("switch.{}", nanoid!(21, ALPHANUMERIC));
-                                Ok(Self::Switch(expr, Box::new(stmt), label, Vec::new()))
+                                Ok(Self::Switch(expr, Box::new(stmt), label, Vec::new(), None))
                             }
                             tok => Err(format!("Expect ')' found: {tok:?}, {tokens:?}")),
                         }
@@ -832,7 +838,7 @@ impl Statement {
                 let label = String::from(scope.unwrap());
                 Ok(Self::Continue(String::from(label)))
             }
-            Self::Switch(expr, stmt, label, mut cases) => {
+            Self::Switch(expr, stmt, label, mut cases, _) => {
                 let scope = Scope::Switch(String::from(&label));
                 env.scopes.push_back(scope);
                 env.cases.push_back(HashSet::new());
@@ -842,7 +848,12 @@ impl Statement {
                 let _ = env.scopes.pop_back();
                 let _ = env.cases.pop_back();
                 cases.extend(env.switches.remove(&label).unwrap().into_iter());
-                Ok(Self::Switch(expr, Box::new(stmt), label, cases))
+                let default = cases.iter().position(|(case, _)| matches!(case, None));
+                let default = match default {
+                    Some(i) => Some(cases.remove(i).1),
+                    _ => None,
+                };
+                Ok(Self::Switch(expr, Box::new(stmt), label, cases, default))
             }
             Self::Case(expr, stmt, lb) => {
                 let scope = env.current_switch();
@@ -901,7 +912,7 @@ impl Statement {
                 Err(String::from("Undefined label."))
             }
             Self::Compound(block) => Block::resolve_labels(block, env),
-            Self::Switch(_, stmt, _, _)
+            Self::Switch(_, stmt, _, _, _)
             | Self::Default(stmt, _)
             | Self::Case(_, stmt, _)
             | Self::If(_, stmt, _)
@@ -934,7 +945,7 @@ impl fmt::Display for Statement {
             Self::For(init, cond, post, stmt, _) => {
                 write!(f, "for {init:?} | {cond:?} | {post:?} {stmt}")
             }
-            Self::Switch(expr, stmt, _, _) => write!(f, "switch ({expr}) {stmt}"),
+            Self::Switch(expr, stmt, _, _, _) => write!(f, "switch ({expr}) {stmt}"),
             Self::Case(expr, stmt, _) => write!(f, "case {expr}: {stmt}"),
             Self::Default(stmt, _) => write!(f, "default: {stmt}"),
         }
