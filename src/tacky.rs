@@ -1,9 +1,7 @@
-use std::{default, fmt};
+use std::fmt;
 
 use nanoid::nanoid;
 use nanoid_dictionary::ALPHANUMERIC;
-
-use crate::parser::Expression;
 
 use super::parser;
 
@@ -463,10 +461,10 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             };
             lin_stmt(*stmt, body)
         }
-        parser::Statement::Case(_, stmt, label) => {
-            todo!()
+        parser::Statement::Case(_, stmt, label) | parser::Statement::Default(stmt, label) => {
+            body.push(Instruction::Label(label));
+            lin_stmt(*stmt, body)
         }
-        _ => todo!(),
     }
 }
 
