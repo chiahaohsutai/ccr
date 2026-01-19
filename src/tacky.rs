@@ -1,7 +1,9 @@
-use std::fmt;
+use std::{default, fmt};
 
 use nanoid::nanoid;
 use nanoid_dictionary::ALPHANUMERIC;
+
+use crate::parser::Expression;
 
 use super::parser;
 
@@ -445,6 +447,24 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             body.push(Instruction::Jump(start));
             body.push(Instruction::Label(break_label));
             Ok(())
+        }
+        parser::Statement::Switch(expr, stmt, _, cases, default) => {
+            let lhs = lin_expr(expr, body)?;
+            for (case, label) in cases.iter() {
+                let case = case.unwrap();
+                let dst = Operand::temp();
+                let rhs = Operand::Constant(case);
+                let op = BinaryOperator::EqualEqual;
+                body.push(Instruction::Binary(op, lhs.clone(), rhs, dst.clone()));
+                body.push(Instruction::JumpIfNotZero(dst, String::from(label)));
+            }
+            if let Some(label) = default {
+                body.push(Instruction::Jump(String::from(label)));
+            };
+            lin_stmt(*stmt, body)
+        }
+        parser::Statement::Case(_, stmt, label) => {
+            todo!()
         }
         _ => todo!(),
     }
