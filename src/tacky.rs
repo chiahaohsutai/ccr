@@ -446,7 +446,7 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             body.push(Instruction::Label(break_label));
             Ok(())
         }
-        parser::Statement::Switch(expr, stmt, _, cases, default) => {
+        parser::Statement::Switch(expr, stmt, lb, cases, default) => {
             let lhs = lin_expr(expr, body)?;
             for (case, label) in cases.iter() {
                 let case = case.unwrap();
@@ -459,7 +459,7 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             if let Some(label) = default {
                 body.push(Instruction::Jump(String::from(label)));
             };
-            let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+            let end = format!("label.break.{lb}");
             body.push(Instruction::Jump(end.clone()));
             let _ = lin_stmt(*stmt, body)?;
             body.push(Instruction::Label(end));
