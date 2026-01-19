@@ -507,7 +507,7 @@ pub enum Statement {
     Continue(String),
     While(Expression, Box<Self>, String),
     DoWhile(Box<Self>, Expression, String),
-    Switch(Expression, Box<Self>, String),
+    Switch(Expression, Box<Self>, String, Vec<(Option<u64>, String)>),
     Case(Expression, Box<Self>, String),
     Default(Box<Self>, String),
     For(
@@ -709,7 +709,7 @@ impl Statement {
                             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)) => {
                                 let stmt = Self::parse(tokens)?;
                                 let label = format!("switch.{}", nanoid!(21, ALPHANUMERIC));
-                                Ok(Self::Switch(expr, Box::new(stmt), label))
+                                Ok(Self::Switch(expr, Box::new(stmt), label, Vec::new()))
                             }
                             tok => Err(format!("Expect ')' found: {tok:?}, {tokens:?}")),
                         }
@@ -722,7 +722,8 @@ impl Statement {
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Colon)) => {
                         let stmt = Self::parse(tokens)?;
-                        Ok(Self::Case(expr, Box::new(stmt), String::from("")))
+                        let label = format!("case.{}", nanoid!(21, ALPHANUMERIC));
+                        Ok(Self::Case(expr, Box::new(stmt), label))
                     }
                     tok => Err(format!("Expected ':' found {tok:?}, {tokens:?}")),
                 }
@@ -731,7 +732,8 @@ impl Statement {
                 match tokens.pop_front() {
                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Colon)) => {
                         let stmt = Self::parse(tokens)?;
-                        Ok(Self::Default(Box::new(stmt), String::from("")))
+                        let label = format!("default.{}", nanoid!(21, ALPHANUMERIC));
+                        Ok(Self::Default(Box::new(stmt), label))
                     }
                     tok => Err(format!("Expected ':' found {tok:?}, {tokens:?}")),
                 }
@@ -830,17 +832,19 @@ impl Statement {
                 let label = String::from(scope.unwrap());
                 Ok(Self::Continue(String::from(label)))
             }
-            Self::Switch(expr, stmt, label) => {
+            Self::Switch(expr, stmt, label, mut cases) => {
                 let scope = Scope::Switch(String::from(&label));
                 env.scopes.push_back(scope);
                 env.cases.push_back(HashSet::new());
+                env.switches.insert(label.clone(), Vec::new());
                 let expr = Expression::resolve(expr, env)?;
                 let stmt = Self::resolve(*stmt, env)?;
                 let _ = env.scopes.pop_back();
                 let _ = env.cases.pop_back();
-                Ok(Self::Switch(expr, Box::new(stmt), label))
+                cases.extend(env.switches.remove(&label).unwrap().into_iter());
+                Ok(Self::Switch(expr, Box::new(stmt), label, cases))
             }
-            Self::Case(expr, stmt, _) => {
+            Self::Case(expr, stmt, lb) => {
                 let scope = env.current_switch();
                 if let None = scope {
                     return Err(String::from("Case statement outside switch block"));
@@ -854,7 +858,12 @@ impl Statement {
                     if cases.get(&case).is_none() {
                         cases.insert(case);
                         let stmt = Self::resolve(*stmt, env)?;
-                        Ok(Self::Case(expr, Box::new(stmt), label))
+                        let case_label = format!("{label}.{lb}");
+                        env.switches
+                            .get_mut(&label)
+                            .unwrap()
+                            .push((Some(value), case_label.clone()));
+                        Ok(Self::Case(expr, Box::new(stmt), case_label))
                     } else {
                         Err(String::from("Found duplicate case."))
                     }
@@ -862,7 +871,7 @@ impl Statement {
                     Err(String::from("Found non-integer case."))
                 }
             }
-            Self::Default(stmt, _) => {
+            Self::Default(stmt, lb) => {
                 let scope = env.current_switch();
                 if let None = scope {
                     return Err(String::from("Default statement outside switch block"));
@@ -873,7 +882,12 @@ impl Statement {
                 if cases.get("default").is_none() {
                     cases.insert(String::from("default"));
                     let stmt = Self::resolve(*stmt, env)?;
-                    Ok(Self::Default(Box::new(stmt), label))
+                    let case_label = format!("{label}.{lb}");
+                    env.switches
+                        .get_mut(&label)
+                        .unwrap()
+                        .push((None, case_label.clone()));
+                    Ok(Self::Default(Box::new(stmt), case_label))
                 } else {
                     Err(String::from("Found duplicate default case."))
                 }
@@ -887,7 +901,7 @@ impl Statement {
                 Err(String::from("Undefined label."))
             }
             Self::Compound(block) => Block::resolve_labels(block, env),
-            Self::Switch(_, stmt, _)
+            Self::Switch(_, stmt, _, _)
             | Self::Default(stmt, _)
             | Self::Case(_, stmt, _)
             | Self::If(_, stmt, _)
@@ -920,7 +934,7 @@ impl fmt::Display for Statement {
             Self::For(init, cond, post, stmt, _) => {
                 write!(f, "for {init:?} | {cond:?} | {post:?} {stmt}")
             }
-            Self::Switch(expr, stmt, _) => write!(f, "switch ({expr}) {stmt}"),
+            Self::Switch(expr, stmt, _, _) => write!(f, "switch ({expr}) {stmt}"),
             Self::Case(expr, stmt, _) => write!(f, "case {expr}: {stmt}"),
             Self::Default(stmt, _) => write!(f, "default: {stmt}"),
         }
@@ -1209,6 +1223,7 @@ struct Environment {
     variables: VarMap<String, String>,
     labels: LabelMap<String>,
     scopes: VecDeque<Scope>,
+    switches: HashMap<String, Vec<(Option<u64>, String)>>,
     cases: VecDeque<HashSet<String>>,
 }
 
@@ -1220,6 +1235,7 @@ impl Environment {
             labels: LabelMap::new(),
             scopes: VecDeque::new(),
             cases: VecDeque::new(),
+            switches: HashMap::new(),
         }
     }
 
