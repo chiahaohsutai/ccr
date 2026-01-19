@@ -459,7 +459,11 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
             if let Some(label) = default {
                 body.push(Instruction::Jump(String::from(label)));
             };
-            lin_stmt(*stmt, body)
+            let end = format!("label.{}", nanoid!(21, ALPHANUMERIC));
+            body.push(Instruction::Jump(end.clone()));
+            let _ = lin_stmt(*stmt, body)?;
+            body.push(Instruction::Label(end));
+            Ok(())
         }
         parser::Statement::Case(_, stmt, label) | parser::Statement::Default(stmt, label) => {
             body.push(Instruction::Label(label));
