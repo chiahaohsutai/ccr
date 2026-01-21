@@ -1,6 +1,10 @@
 use tempfile::{Builder, NamedTempFile};
 
-use std::{fs, path, process};
+use std::{
+    fs,
+    path::{self, Path, PathBuf},
+    process,
+};
 
 pub mod codegen;
 pub mod parser;
@@ -45,7 +49,11 @@ fn compile<T: AsRef<path::Path>>(
     Ok(Some(instructions.to_string()))
 }
 
-pub fn build(input: &path::Path, stop_after: Option<CompileStep>) -> Result<(), String> {
+pub fn build(
+    input: &path::Path,
+    stop_after: Option<CompileStep>,
+    executable: bool,
+) -> Result<(), String> {
     let inter = Builder::new()
         .suffix(".i")
         .tempfile()
@@ -70,11 +78,18 @@ pub fn build(input: &path::Path, stop_after: Option<CompileStep>) -> Result<(), 
             .tempfile()
             .map_err(|e| format!("Failed to '.s' file: {e}"))?;
 
-        let dst = input.parent().unwrap().join(input.file_stem().unwrap());
         fs::write(src.path(), instrs).map_err(|e| e.to_string())?;
 
+        let output = if executable {
+            PathBuf::from(input.file_stem().unwrap())
+        } else {
+            Path::new(input.file_stem().unwrap()).with_extension("o")
+        };
+
         let mut cmd = process::Command::new("gcc");
-        let cmd = cmd.arg(src.path()).arg("-o").arg(dst);
+        cmd.arg(src.path())
+            .arg("-o")
+            .arg(input.parent().unwrap().join(output));
 
         match cmd.status() {
             Ok(status) if status.success() => Ok(()),
