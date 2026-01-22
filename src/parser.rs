@@ -399,9 +399,9 @@ impl fmt::Display for Expression {
 
 /// Represents a variable declaration.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Declaration(String, Option<Expression>);
+pub struct VarDecl(String, Option<Expression>);
 
-impl Declaration {
+impl VarDecl {
     /// Returns the declared variable name.
     pub fn name(&self) -> &str {
         &self.0
@@ -411,54 +411,109 @@ impl Declaration {
     pub fn initializer(self) -> Option<Expression> {
         self.1
     }
+}
+
+impl fmt::Display for VarDecl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(init) = &self.1 {
+            write!(f, "{} = {init}", self.0)
+        } else {
+            write!(f, "{}", self.0)
+        }
+    }
+}
+
+/// Represents a function declartion.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunDecl(String, Vec<String>, Block);
+
+impl FunDecl {
+    /// Returns the declared function name.
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Display for FunDecl {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({}) {}", self.0, self.1.join(", "), self.2)
+    }
+}
+
+/// Represents a declaration.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Declaration {
+    Fun(FunDecl),
+    Var(VarDecl),
+}
+
+impl fmt::Display for Declaration {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Fun(fun) => write!(f, "{fun}"),
+            Self::Var(var) => write!(f, "{var}"),
+        }
+    }
+}
+
+impl Declaration {
+    /// Returns the declared variable name.
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Fun(fun) => fun.name(),
+            Self::Var(fun) => fun.name(),
+        }
+    }
 
     /// Parses a declaration
     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
-        match tokens.pop_front() {
-            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
-                let name = match tokens.pop_front() {
-                    Some(tokenizer::Token::Identifier(identifier)) => Ok(identifier),
-                    None => Err(String::from("Unexpected end of input.")),
-                    _ => Err(String::from("Expected identifier after 'int'.")),
-                }?;
-                match tokens.pop_front() {
-                    Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                        Ok(Self(name, None))
-                    }
-                    Some(tokenizer::Token::Operator(tokenizer::Operator::Assignment)) => {
-                        let expr = Expression::parse(tokens, 0)?;
-                        match tokens.pop_front() {
-                            Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
-                                Ok(Self(name, Some(expr)))
-                            }
-                            tok => Err(format!("Expected ';' after declaration, found: {tok:?}")),
-                        }
-                    }
-                    _ => Err(String::from("Expected ';' or '=' after variable name.")),
-                }
-            }
-            tok => Err(format!("Expected 'int' found: {tok:?}")),
-        }
+        // match tokens.pop_front() {
+        //     Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
+        //         let name = match tokens.pop_front() {
+        //             Some(tokenizer::Token::Identifier(identifier)) => Ok(identifier),
+        //             None => Err(String::from("Unexpected end of input.")),
+        //             _ => Err(String::from("Expected identifier after 'int'.")),
+        //         }?;
+        //         match tokens.pop_front() {
+        //             Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+        //                 Ok(Self(name, None))
+        //             }
+        //             Some(tokenizer::Token::Operator(tokenizer::Operator::Assignment)) => {
+        //                 let expr = Expression::parse(tokens, 0)?;
+        //                 match tokens.pop_front() {
+        //                     Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::Semicolon)) => {
+        //                         Ok(Self(name, Some(expr)))
+        //                     }
+        //                     tok => Err(format!("Expected ';' after declaration, found: {tok:?}")),
+        //                 }
+        //             }
+        //             _ => Err(String::from("Expected ';' or '=' after variable name.")),
+        //         }
+        //     }
+        //     tok => Err(format!("Expected 'int' found: {tok:?}")),
+        // }
+        todo!()
     }
 
     /// Resolves a variable declaration within the given symbol table.
     fn resolve(declaration: Self, env: &mut Environment) -> Result<Self, String> {
-        let id = nanoid!(21, ALPHANUMERIC);
-        let name = format!("var.{}.{id}", &declaration.0);
+        // let id = nanoid!(21, ALPHANUMERIC);
+        // let name = format!("var.{}.{id}", &declaration.0);
 
-        if let None = env
-            .variables
-            .insert(String::from(&declaration.0), String::from(&name))
-        {
-            if let Some(expr) = declaration.1 {
-                let initializer = Expression::resolve(expr, env)?;
-                Ok(Declaration(name, Some(initializer)))
-            } else {
-                Ok(Declaration(name, None))
-            }
-        } else {
-            Err(String::from("Duplicate variable declaration"))
-        }
+        // if let None = env
+        //     .variables
+        //     .insert(String::from(&declaration.0), String::from(&name))
+        // {
+        //     if let Some(expr) = declaration.1 {
+        //         let initializer = Expression::resolve(expr, env)?;
+        //         Ok(Declaration(name, Some(initializer)))
+        //     } else {
+        //         Ok(Declaration(name, None))
+        //     }
+        // } else {
+        //     Err(String::from("Duplicate variable declaration"))
+        // }
+        todo!()
     }
 }
 
@@ -989,7 +1044,7 @@ impl BlockItem {
 impl fmt::Display for BlockItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Declaration(declaration) => write!(f, "{} {:?}", declaration.0, declaration.1),
+            Self::Declaration(declaration) => write!(f, "{declaration}"),
             Self::Statement(statement) => write!(f, "{}", statement),
         }
     }
@@ -1057,80 +1112,85 @@ impl fmt::Display for Block {
 }
 
 /// Represents a function definition in the abstract syntax tree.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Function(String, Block);
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct Function(String, Block);
 
-impl Function {
-    /// Returns the function name.
-    pub fn name(&self) -> &str {
-        &self.0
-    }
+// impl Function {
+//     /// Returns the function name.
+//     pub fn name(&self) -> &str {
+//         &self.0
+//     }
 
-    /// Returns the sequence of block items that make up the function body.
-    pub fn instructions(self) -> Vec<BlockItem> {
-        self.1.0
-    }
+//     /// Returns the sequence of block items that make up the function body.
+//     pub fn instructions(self) -> Vec<BlockItem> {
+//         self.1.0
+//     }
 
-    /// Parses a function definition from the token stream.
-    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
-        match tokens.pop_front() {
-            Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
-                let name = match tokens.pop_front() {
-                    Some(tokenizer::Token::Identifier(name)) => Ok(name),
-                    None => Err(String::from("Unexpected end of input.")),
-                    _ => Err(String::from("Expected identifier.")),
-                }?;
-                match (tokens.pop_front(), tokens.pop_front(), tokens.pop_front()) {
-                    (
-                        Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)),
-                        Some(tokenizer::Token::Keyword(tokenizer::Keyword::Void)),
-                        Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)),
-                    ) => Ok(Function(name, Block::parse(tokens)?)),
-                    _ => Err(String::from("Expected '(void)' after fn name.")),
-                }
-            }
-            None => Err(String::from("Unexpected end of input while parsing fn.")),
-            _ => Err(String::from("Expected 'int' keyword at the start of a fn.")),
-        }
-    }
+//     /// Parses a function definition from the token stream.
+//     fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+//         match tokens.pop_front() {
+//             Some(tokenizer::Token::Keyword(tokenizer::Keyword::Int)) => {
+//                 let name = match tokens.pop_front() {
+//                     Some(tokenizer::Token::Identifier(name)) => Ok(name),
+//                     None => Err(String::from("Unexpected end of input.")),
+//                     _ => Err(String::from("Expected identifier.")),
+//                 }?;
+//                 match (tokens.pop_front(), tokens.pop_front(), tokens.pop_front()) {
+//                     (
+//                         Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::LeftParen)),
+//                         Some(tokenizer::Token::Keyword(tokenizer::Keyword::Void)),
+//                         Some(tokenizer::Token::Delimiter(tokenizer::Delimiter::RightParen)),
+//                     ) => Ok(Function(name, Block::parse(tokens)?)),
+//                     _ => Err(String::from("Expected '(void)' after fn name.")),
+//                 }
+//             }
+//             None => Err(String::from("Unexpected end of input while parsing fn.")),
+//             _ => Err(String::from("Expected 'int' keyword at the start of a fn.")),
+//         }
+//     }
 
-    /// Resolves identifiers within the function body using the provided symbol table.
-    fn resolve(function: Self, env: &mut Environment) -> Result<Self, String> {
-        let name = String::from(&function.0);
-        let block = Block::resolve(function.1, env)?;
-        Block::resolve_labels(&block, env)?;
-        Ok(Function(name, block))
-    }
-}
+//     /// Resolves identifiers within the function body using the provided symbol table.
+//     fn resolve(function: Self, env: &mut Environment) -> Result<Self, String> {
+//         let name = String::from(&function.0);
+//         let block = Block::resolve(function.1, env)?;
+//         Block::resolve_labels(&block, env)?;
+//         Ok(Function(name, block))
+//     }
+// }
 
-impl fmt::Display for Function {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "FN {}\n{}\nEND FN {}", self.0, self.1, self.0)
-    }
-}
+// impl fmt::Display for Function {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         write!(f, "FN {}\n{}\nEND FN {}", self.0, self.1, self.0)
+//     }
+// }
 
-impl From<Program> for Function {
-    fn from(program: Program) -> Self {
-        program.0
-    }
-}
+// impl From<Program> for Function {
+//     fn from(program: Program) -> Self {
+//         program.0
+//     }
+// }
 
 /// Represents a complete program.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Program(Function);
+pub struct Program(Vec<FunDecl>);
+
+impl Program {
+    fn parse(tokens: &mut VecDeque<tokenizer::Token>) -> Result<Self, String> {
+        todo!()
+    }
+}
 
 impl fmt::Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        let funtions: Vec<String> = self.0.iter().map(|f| f.to_string()).collect();
+        write!(f, "{}", funtions.join("\n\n"))
     }
 }
 
 /// Parses a complete program from a sequence of tokens.
 pub fn parse(tokens: Vec<tokenizer::Token>) -> Result<Program, String> {
     let mut tokens: VecDeque<tokenizer::Token> = VecDeque::from(tokens);
-
-    let main = Function::parse(&mut tokens)?;
-    let program = Program(main);
+    let program = Program::parse(&mut tokens)?;
 
     if tokens.is_empty() {
         Ok(program)
@@ -1267,7 +1327,8 @@ impl Environment {
 
 /// Validates and resolves the program's abstract syntax tree.
 pub fn validate(ast: Program) -> Result<Program, String> {
-    let main = Function::from(ast);
+    let main = ast.0;
     let mut variables: Environment = Environment::new();
-    Ok(Program(Function::resolve(main, &mut variables)?))
+    // Ok(Program(Function::resolve(main, &mut variables)?))
+    todo!()
 }

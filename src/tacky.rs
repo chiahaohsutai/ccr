@@ -473,13 +473,14 @@ fn lin_stmt(statement: parser::Statement, body: &mut Vec<Instruction>) -> Result
 }
 
 fn lin_decl(decl: parser::Declaration, body: &mut Vec<Instruction>) -> Result<(), String> {
-    let name = String::from(decl.name());
-    if let Some(expr) = decl.initializer() {
-        let opr = lin_expr(expr, body)?;
-        let dst = Operand::Variable(name);
-        body.push(Instruction::Copy(opr, dst));
-    };
-    Ok(())
+    todo!();
+    // let name = String::from(decl.name());
+    // if let Some(expr) = decl.initializer() {
+    //     let opr = lin_expr(expr, body)?;
+    //     let dst = Operand::Variable(name);
+    //     body.push(Instruction::Copy(opr, dst));
+    // };
+    // Ok(())
 }
 
 fn lin_block_item(item: parser::BlockItem, body: &mut Vec<Instruction>) -> Result<(), String> {
@@ -515,33 +516,34 @@ impl From<Function> for Vec<Instruction> {
     }
 }
 
-impl TryFrom<parser::Function> for Function {
-    type Error = String;
+// impl TryFrom<parser::Function> for Function {
+//     type Error = String;
 
-    fn try_from(function: parser::Function) -> Result<Self, String> {
-        let name = String::from(function.name());
-        let mut body: Vec<Instruction> = Vec::new();
+//     fn try_from(function: parser::Function) -> Result<Self, String> {
+//         let name = String::from(function.name());
+//         let mut body: Vec<Instruction> = Vec::new();
 
-        for item in function.instructions() {
-            match item {
-                parser::BlockItem::Declaration(decl) => {
-                    let name = String::from(decl.name());
-                    if let Some(expr) = decl.initializer() {
-                        let opr = lin_expr(expr, &mut body)?;
-                        let dst = Operand::Variable(name);
-                        body.push(Instruction::Copy(opr, dst));
-                    }
-                }
-                parser::BlockItem::Statement(stmt) => lin_stmt(stmt, &mut body)?,
-            };
-        }
-        match body.last() {
-            Some(Instruction::Return(_)) => (),
-            _ => body.push(Instruction::Return(Operand::Constant(0))),
-        };
-        Ok(Function(name, body))
-    }
-}
+//         for item in function.instructions() {
+//             match item {
+//                 parser::BlockItem::Declaration(decl) => {
+//                     let name = String::from(decl.name());
+//                     todo!()
+//                     //     if let Some(expr) = decl.initializer() {
+//                     //         let opr = lin_expr(expr, &mut body)?;
+//                     //         let dst = Operand::Variable(name);
+//                     //         body.push(Instruction::Copy(opr, dst));
+//                     //     }
+//                 }
+//                 parser::BlockItem::Statement(stmt) => lin_stmt(stmt, &mut body)?,
+//             };
+//         }
+//         match body.last() {
+//             Some(Instruction::Return(_)) => (),
+//             _ => body.push(Instruction::Return(Operand::Constant(0))),
+//         };
+//         Ok(Function(name, body))
+//     }
+// }
 
 impl From<Program> for Function {
     fn from(program: Program) -> Self {
@@ -561,7 +563,8 @@ impl TryFrom<parser::Program> for Program {
     type Error = String;
 
     fn try_from(program: parser::Program) -> Result<Self, String> {
-        let function = parser::Function::from(program);
-        Ok(Program(Function::try_from(function)?))
+        // let function = parser::Function::from(program);
+        // Ok(Program(Function::try_from(function)?))
+        todo!()
     }
 }
