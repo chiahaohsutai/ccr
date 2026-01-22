@@ -320,6 +320,7 @@ pub enum Delimiter {
     RightBrace,
     QuestionMark,
     Colon,
+    Comma,
 }
 
 impl Delimiter {
@@ -331,7 +332,7 @@ impl Delimiter {
     /// Attempts to match a delimiter at the start of the input string.
     fn find_match(input: &str) -> Option<Self> {
         static RE: sync::LazyLock<Regex> = sync::LazyLock::new(|| {
-            let pattern = r"^[;:\?\(\)\{\}]";
+            let pattern = r"^[,;:\?\(\)\{\}]";
             Regex::new(pattern).unwrap()
         });
         RE.find(input).map(|m| Self::from_str(m.as_str()).unwrap())
@@ -354,6 +355,7 @@ impl Delimiter {
 impl AsRef<str> for Delimiter {
     fn as_ref(&self) -> &str {
         match self {
+            Self::Comma => ",",
             Self::Colon => ":",
             Self::QuestionMark => "?",
             Self::LeftParen => "(",
@@ -377,6 +379,7 @@ impl FromStr for Delimiter {
             "}" => Ok(Self::RightBrace),
             "?" => Ok(Self::QuestionMark),
             ":" => Ok(Self::Colon),
+            "," => Ok(Self::Comma),
             _ => Err(format!("Unknown delimiter: {}", s)),
         }
     }
