@@ -7,6 +7,7 @@ use std::{
 };
 
 pub mod codegen;
+mod compiler;
 pub mod parser;
 pub mod tacky;
 pub mod tokenizer;
