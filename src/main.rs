@@ -21,7 +21,7 @@ fn build_cli() -> Command {
         arg!(--tacky "Generates tacky assembly and exits"),
         arg!(--codegen "Runs assembly generation and exits"),
         arg!(--validate "Runs semantic analysis and exists"),
-        arg!(-c "Generates an object file instead of an execuable"),
+        arg!("compile": -c "Generates an object file instead of an execuable"),
     ];
 
     let stop_after = ArgGroup::new("stop_after")
@@ -55,7 +55,7 @@ fn main() {
             arg => panic!("Unrecognized argument '{arg}'"),
         });
 
-    let executable: Option<&u8> = args.get_one("c");
+    let executable: Option<&bool> = args.get_one("compile");
     if path.exists() && path.is_file() {
         if let Err(e) = build(path, stop_after, executable.is_none()) {
             error!("Compilation failed: {}", e);
