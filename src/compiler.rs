@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
-mod tokenizer;
+pub mod parser;
+pub mod tokenizer;
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Stage {
@@ -26,6 +27,13 @@ impl FromStr for Stage {
     }
 }
 
-fn compile<T: AsRef<str>>(input: T, stop_after: Option<Stage>) -> Result<Option<String>, String> {
+pub fn compile<T: AsRef<str>>(
+    input: T,
+    stop_after: Option<Stage>,
+) -> Result<Option<String>, String> {
+    let tokens = tokenizer::tokenize(input)?;
+    if matches!(stop_after, Some(Stage::Lex)) {
+        return Ok(None);
+    }
     todo!()
 }
