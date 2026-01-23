@@ -1,19 +1,19 @@
+use std::path::Path;
+use std::str::FromStr;
+
 use clap::{ArgGroup, Command, Id, arg};
-use tracing::{Level, error};
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use std::{path, process};
+use nora::{build, compiler};
 
-use nora::{CompileStep, build};
-
-fn init_loggging(level: Level) {
+fn init_loggging(level: Level) -> Result<(), String> {
     let subscriber = FmtSubscriber::builder().with_max_level(level).finish();
-    if let Err(e) = tracing::subscriber::set_global_default(subscriber) {
-        panic!("Failed to set global default subscriber: {}", e);
-    }
+    tracing::subscriber::set_global_default(subscriber)
+        .map_err(|_| format!("Failed to initialize tracing subscriber"))
 }
 
-fn build_cli() -> Command {
+fn cli() -> Command {
     let args = [
         arg!(<path> "Absolute or relative path to C source file"),
         arg!(--lex "Runs the lexer and exits"),
@@ -23,44 +23,36 @@ fn build_cli() -> Command {
         arg!(--validate "Runs semantic analysis and exists"),
         arg!("compile": -c "Generates an object file instead of an execuable"),
     ];
-
     let stop_after = ArgGroup::new("stop_after")
         .args(["lex", "parse", "tacky", "codegen", "validate"])
         .multiple(false)
         .required(false);
 
-    Command::new("CCR")
+    Command::new("NORA")
         .about("A C compiler written in Rust")
-        .long_about("A simple C compiler written in Rust for educational purposes.")
-        .author("Youf favorite programmer CHIA")
-        .alias("ccr")
+        .long_about("A simple C compiler for a subset of C")
+        .author("Your favorite programmer CHIA")
+        .alias("nora")
         .args(args)
         .group(stop_after)
 }
 
-fn main() {
-    init_loggging(Level::DEBUG);
+fn main() -> Result<(), String> {
+    init_loggging(Level::DEBUG)?;
 
-    let args = build_cli().get_matches();
-    let path = path::Path::new(args.get_one::<String>("path").unwrap());
+    let args = cli().get_matches();
+    let path = Path::new(args.get_one::<String>("path").unwrap());
 
-    let stop_after = args
-        .get_one::<Id>("stop_after")
-        .map(|id| match id.as_str() {
-            "lex" => CompileStep::LEX,
-            "parse" => CompileStep::PARSE,
-            "tacky" => CompileStep::TACKY,
-            "codegen" => CompileStep::CODEGEN,
-            "validate" => CompileStep::VALIDATE,
-            arg => panic!("Unrecognized argument '{arg}'"),
-        });
+    let stop_after = match args.get_one::<Id>("stop_after") {
+        Some(stop_after) => Some(compiler::Stage::from_str(stop_after.as_str())?),
+        None => None,
+    };
+    let compile_only: &bool = args.get_one("compile").unwrap_or(&false);
 
-    let executable: Option<&bool> = args.get_one("compile");
     if path.exists() && path.is_file() {
-        if let Err(e) = build(path, stop_after, executable.is_none()) {
-            error!("Compilation failed: {}", e);
-            eprintln!("Compilation failed: {}", e);
-            process::exit(1);
-        }
+        build(path, stop_after, *compile_only)?;
+        Ok(())
+    } else {
+        Err(format!("Invalid path: {}", path.display()))
     }
 }
