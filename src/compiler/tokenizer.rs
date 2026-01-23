@@ -1,6 +1,7 @@
-use regex::Regex;
-
+use std::fmt;
 use std::sync::LazyLock;
+
+use regex::Regex;
 
 static RE: LazyLock<Regex> = LazyLock::new(|| {
     let pattern = r"^(?:(?:continue|switch|default|return|while|break|void|case|else|goto|for|int|if|do)\b|(?:[a-zA-Z_]\w*)\b|(?:[0-9]+)\b|<<=|>>=|\+=|-=|\/=|\*=|%=|&=|\|=|\^=|<=|>=|--|\+\+|<<|>>|&&|\|\||==|!=|[,;:\?\(\)\{\}\-~\+\*\/%&\|\^!><=])";
@@ -131,6 +132,71 @@ impl From<&str> for Token {
                 Err(_) => Self::Identifier(String::from(s)),
             },
         }
+    }
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::PlusPlus => "++",
+            Self::MinusMinus => "--",
+            Self::Bang => "!",
+            Self::Tilde => "~",
+            Self::Plus => "+",
+            Self::Minus => "-",
+            Self::Star => "*",
+            Self::Slash => "/",
+            Self::Percent => "%",
+            Self::Amp => "&",
+            Self::Pipe => "|",
+            Self::Caret => "^",
+            Self::Shl => "<<",
+            Self::Shr => ">>",
+            Self::AmpAmp => "&&",
+            Self::PipePipe => "||",
+            Self::EqEq => "==",
+            Self::NotEq => "!=",
+            Self::Lt => "<",
+            Self::Gt => ">",
+            Self::Le => "<=",
+            Self::Ge => ">=",
+            Self::Eq => "=",
+            Self::PlusEq => "+=",
+            Self::MinusEq => "-=",
+            Self::StarEq => "*=",
+            Self::SlashEq => "/=",
+            Self::PercentEq => "%=",
+            Self::AmpEq => "&=",
+            Self::PipeEq => "|=",
+            Self::CaretEq => "^=",
+            Self::ShlEq => "<<=",
+            Self::ShrEq => ">>=",
+            Self::LParen => "(",
+            Self::RParen => ")",
+            Self::LBrace => "{",
+            Self::RBrace => "}",
+            Self::Semicolon => ";",
+            Self::Colon => ":",
+            Self::Eroteme => "?",
+            Self::Comma => ",",
+            Self::If => "if",
+            Self::Else => "else",
+            Self::Int => "int",
+            Self::Void => "void",
+            Self::Return => "return",
+            Self::Goto => "Goto",
+            Self::Do => "Do",
+            Self::While => "While",
+            Self::For => "For",
+            Self::Break => "Break",
+            Self::Continue => "Continue",
+            Self::Switch => "Switch",
+            Self::Case => "Case",
+            Self::Default => "Default",
+            Self::Constant(val) => return write!(f, "{}", val),
+            Self::Identifier(name) => return write!(f, "{}", name),
+        };
+        write!(f, "{}", s)
     }
 }
 
