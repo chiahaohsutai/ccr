@@ -1,3 +1,12 @@
+use regex::Regex;
+
+use std::sync::LazyLock;
+
+static RE: LazyLock<Regex> = LazyLock::new(|| {
+    let pattern = r"^(?:(?:continue|switch|default|return|while|break|void|case|else|goto|for|int|if|do)\b|(?:[a-zA-Z_]\w*)\b|(?:[0-9]+)\b|<<=|>>=|\+=|-=|\/=|\*=|%=|&=|\|=|\^=|<=|>=|--|\+\+|<<|>>|&&|\|\||==|!=|[,;:\?\(\)\{\}\-~\+\*\/%&\|\^!><=])";
+    Regex::new(pattern).unwrap()
+});
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     PlusPlus,           // ++
@@ -125,10 +134,29 @@ impl From<&str> for Token {
     }
 }
 
-fn find(pattern: &str, haystack: &str) -> Result<String, String> {
-    todo!()
+fn is_whitespace<T: AsRef<str>>(s: T) -> bool {
+    s.as_ref().chars().all(|c| c.is_whitespace())
 }
 
-fn tokenize<T: AsRef<str>>(input: T) -> Result<Vec<Token>, String> {
-    todo!()
+pub fn tokenize<T: AsRef<str>>(input: T) -> Result<Vec<Token>, String> {
+    let input = input.as_ref();
+
+    let mut i = 0;
+    let mut tokens = vec![];
+
+    while i < input.len() {
+        while i < input.len() && is_whitespace(&input[i..i + 1]) {
+            i += 1
+        }
+        if i < input.len() {
+            RE.find(&input[i..])
+                .map(|m| {
+                    let token = Token::from(m.as_str());
+                    tokens.push(token);
+                    i += m.as_str().len()
+                })
+                .ok_or(format!("Unrecognized token starting here at index {i}"))?;
+        }
+    }
+    Ok(tokens)
 }
