@@ -27,7 +27,7 @@ impl FromStr for Stage {
     }
 }
 
-pub fn compile<T: AsRef<str>>(
+pub fn assemble<T: AsRef<str>>(
     input: T,
     stop_after: Option<Stage>,
 ) -> Result<Option<String>, String> {
