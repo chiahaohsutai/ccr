@@ -3,8 +3,10 @@ use std::{fs, process};
 
 use tempfile::{Builder, NamedTempFile};
 
+use crate::compiler::Target;
+
+pub mod cli;
 mod compiler;
-pub use compiler::Stage as CompilerStage;
 
 fn preprocess(input: &Path) -> Result<NamedTempFile, String> {
     let inter = Builder::new()
@@ -48,8 +50,8 @@ fn link(input: &Path, output: &Path) -> Result<(), String> {
 
 pub fn build(
     input: &Path,
+    target: compiler::Target,
     stop_after: Option<compiler::Stage>,
-    compile_only: bool,
 ) -> Result<(), String> {
     let contents = fs::read_to_string(preprocess(input)?.path()).map_err(|e| e.to_string())?;
     let instructions = compiler::assemble(contents, stop_after)?;
@@ -62,7 +64,7 @@ pub fn build(
 
         fs::write(s.path(), instructions).map_err(|e| e.to_string())?;
 
-        if compile_only {
+        if let compiler::Target::ObjFile = target {
             let output = Path::new(input.file_stem().unwrap()).with_extension("o");
             compile(s.path(), &output)
         } else {
