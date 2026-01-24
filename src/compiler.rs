@@ -1,7 +1,14 @@
 use std::str::FromStr;
 
-pub mod parser;
-pub mod tokenizer;
+use nanoid::nanoid;
+use nanoid_dictionary::ALPHANUMERIC;
+
+mod parser;
+mod tokenizer;
+
+fn generate_tag<T: AsRef<str>>(prefix: T) -> String {
+    format!("{}.{}", prefix.as_ref(), nanoid!(21, ALPHANUMERIC))
+}
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Stage {

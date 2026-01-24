@@ -1,11 +1,5 @@
-use nanoid::nanoid;
-use nanoid_dictionary::ALPHANUMERIC;
-
+use super::generate_tag;
 use super::tokenizer::Token;
-
-fn generate_tag<T: AsRef<str>>(prefix: T) -> String {
-    format!("{}.{}", prefix.as_ref(), nanoid!(21, ALPHANUMERIC))
-}
 
 fn generate_label() -> String {
     generate_tag("label")

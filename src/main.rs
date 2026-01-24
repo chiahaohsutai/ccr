@@ -5,7 +5,7 @@ use clap::{ArgGroup, Command, Id, arg};
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use nora::{build, compiler};
+use nora::{CompilerStage, build};
 
 fn init_loggging(level: Level) -> Result<(), String> {
     let subscriber = FmtSubscriber::builder().with_max_level(level).finish();
@@ -44,7 +44,7 @@ fn main() -> Result<(), String> {
     let path = Path::new(args.get_one::<String>("path").unwrap());
 
     let stop_after = match args.get_one::<Id>("stop_after") {
-        Some(stop_after) => Some(compiler::Stage::from_str(stop_after.as_str())?),
+        Some(stop_after) => Some(CompilerStage::from_str(stop_after.as_str())?),
         None => None,
     };
     let compile_only: &bool = args.get_one("compile").unwrap_or(&false);
