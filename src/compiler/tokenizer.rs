@@ -17,63 +17,63 @@ static RE: LazyLock<Regex> = LazyLock::new(|| {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
-    PlusPlus,           // ++
-    MinusMinus,         // --
-    Bang,               // !
-    Tilde,              // ~
-    Plus,               // +
-    Minus,              // -
-    Star,               // *
-    Slash,              // /
-    Percent,            // %
-    Amp,                // &
-    Pipe,               // |
-    Caret,              // ^
-    Shl,                // <<
-    Shr,                // >>
-    AmpAmp,             // &&
-    PipePipe,           // ||
-    EqEq,               // ==
-    NotEq,              // !=
-    Lt,                 // <
-    Gt,                 // >
-    Le,                 // <=
-    Ge,                 // >=
-    Eq,                 // =
-    PlusEq,             // +=
-    MinusEq,            // -=
-    StarEq,             // *=
-    SlashEq,            // /=
-    PercentEq,          // %=
-    AmpEq,              // &=
-    PipeEq,             // |=
-    CaretEq,            // ^=
-    ShlEq,              // <<=
-    ShrEq,              // >>=
-    LParen,             // (
-    RParen,             // )
-    LBrace,             // {
-    RBrace,             // }
-    Semicolon,          // ;
-    Colon,              // :
-    Eroteme,            // ?
-    Comma,              // ,
-    If,                 // if
-    Else,               // else
-    Int,                // int
-    Void,               // void
-    Return,             // return
-    Goto,               // goto
-    Do,                 // do
-    While,              // while
-    For,                // for
-    Break,              // break
-    Continue,           // continue
-    Switch,             // switch
-    Case,               // case
-    Default,            // default
-    Constant(u64),      // constant
-    Identifier(String), // identifier
+    PlusPlus,      // ++
+    MinusMinus,    // --
+    Bang,          // !
+    Tilde,         // ~
+    Plus,          // +
+    Minus,         // -
+    Star,          // *
+    Slash,         // /
+    Percent,       // %
+    Amp,           // &
+    Pipe,          // |
+    Caret,         // ^
+    Shl,           // <<
+    Shr,           // >>
+    AmpAmp,        // &&
+    PipePipe,      // ||
+    EqEq,          // ==
+    NotEq,         // !=
+    Lt,            // <
+    Gt,            // >
+    Le,            // <=
+    Ge,            // >=
+    Eq,            // =
+    PlusEq,        // +=
+    MinusEq,       // -=
+    StarEq,        // *=
+    SlashEq,       // /=
+    PercentEq,     // %=
+    AmpEq,         // &=
+    PipeEq,        // |=
+    CaretEq,       // ^=
+    ShlEq,         // <<=
+    ShrEq,         // >>=
+    LParen,        // (
+    RParen,        // )
+    LBrace,        // {
+    RBrace,        // }
+    Semicolon,     // ;
+    Colon,         // :
+    Eroteme,       // ?
+    Comma,         // ,
+    If,            // if
+    Else,          // else
+    Int,           // int
+    Void,          // void
+    Return,        // return
+    Goto,          // goto
+    Do,            // do
+    While,         // while
+    For,           // for
+    Break,         // break
+    Continue,      // continue
+    Switch,        // switch
+    Case,          // case
+    Default,       // default
+    Const(u64),    // constant
+    Ident(String), // identifier
 }
 
 impl From<&str> for Token {
@@ -135,8 +135,8 @@ impl From<&str> for Token {
             "Case" => Self::Case,
             "Default" => Self::Default,
             s => match s.parse::<u64>() {
-                Ok(constant) => Self::Constant(constant),
-                Err(_) => Self::Identifier(String::from(s)),
+                Ok(constant) => Self::Const(constant),
+                Err(_) => Self::Ident(String::from(s)),
             },
         }
     }
@@ -200,8 +200,8 @@ impl fmt::Display for Token {
             Self::Switch => "Switch",
             Self::Case => "Case",
             Self::Default => "Default",
-            Self::Constant(val) => return write!(f, "{}", val),
-            Self::Identifier(name) => return write!(f, "{}", name),
+            Self::Const(val) => return write!(f, "{}", val),
+            Self::Ident(name) => return write!(f, "{}", name),
         };
         write!(f, "{}", s)
     }
