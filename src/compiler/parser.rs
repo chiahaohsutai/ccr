@@ -1,8 +1,21 @@
+use std::collections::VecDeque;
+use std::fmt;
+
 use super::generate_tag;
 use super::tokenizer::Token;
 
 fn generate_label() -> String {
     generate_tag("label")
+}
+
+enum Scope {
+    Loop(String),
+    Switch(String),
+}
+
+struct State {
+    tokens: VecDeque<Token>,
+    scopes: VecDeque<Scope>,
 }
 
 enum UnaryOp {
@@ -11,6 +24,18 @@ enum UnaryOp {
     Neg,
     Not,
     Compl,
+}
+
+impl fmt::Display for UnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Decr => write!(f, "--"),
+            Self::Incr => write!(f, "++"),
+            Self::Neg => write!(f, "-"),
+            Self::Not => write!(f, "!"),
+            Self::Compl => write!(f, "~"),
+        }
+    }
 }
 
 enum BinOp {
@@ -53,10 +78,70 @@ enum Factor {
     PosUnary(UnaryOp, Box<Self>),
 }
 
+type ParserResult<T> = Result<(T, State), String>;
+type Parser<T> = fn(State) -> ParserResult<T>;
+
+fn expect(mut state: State, expected: Token) -> Result<State, String> {
+    let token = state
+        .tokens
+        .pop_front()
+        .ok_or(format!("Unexpected end of input: expected `{expected}`"))?;
+    token
+        .eq(&expected)
+        .then(|| state)
+        .ok_or(format!("Expected `{expected}` but found `{token}`"))
+}
+
+fn then_expect<T>(state: State, handler: Parser<T>, expected: Token) -> ParserResult<T> {
+    let (node, state) = handler(state)?;
+    let state = expect(state, expected)?;
+    Ok((node, state))
+}
+
+fn parse_prefix_unary_factor(op: UnaryOp, state: State) -> ParserResult<Factor> {
+    let (factor, state) = parse_factor(state)?;
+    Ok((Factor::PreUnary(op, Box::new(factor)), state))
+}
+
+fn parse_factor(mut state: State) -> ParserResult<Factor> {
+    let curr = state.tokens.pop_front();
+    let next = state.tokens.front();
+
+    let token = curr.ok_or("Unexpected end of input: expected factor")?;
+    let next_is_incr_decr = next.is_some_and(|t| matches!(t, Token::PlusPlus | Token::MinusMinus));
+
+    let (factor, state) = match token {
+        Token::Ident(ident) if next_is_incr_decr => {
+            let factor = Box::new(Factor::Ident(ident));
+            match state.tokens.pop_front().unwrap() {
+                Token::PlusPlus => (Factor::PosUnary(UnaryOp::Incr, factor), state),
+                _ => (Factor::PosUnary(UnaryOp::Decr, factor), state),
+            }
+        }
+        Token::Ident(ident) => (Factor::Ident(ident), state),
+        Token::Const(constant) => (Factor::Int(constant), state),
+        Token::MinusMinus => parse_prefix_unary_factor(UnaryOp::Decr, state)?,
+        Token::PlusPlus => parse_prefix_unary_factor(UnaryOp::Incr, state)?,
+        Token::Minus => parse_prefix_unary_factor(UnaryOp::Neg, state)?,
+        Token::Bang => parse_prefix_unary_factor(UnaryOp::Not, state)?,
+        Token::Tilde => parse_prefix_unary_factor(UnaryOp::Compl, state)?,
+        Token::LParen => {
+            let (expr, state) = then_expect(state, parse_expr, Token::RParen)?;
+            (Factor::Expr(Box::new(expr)), state)
+        }
+        token => return Err(format!("Invalid factor: unexpected token `{token}`")),
+    };
+    Ok((factor, state))
+}
+
 enum Expr {
     Fac(Factor),
     Cond(Box<Self>, Box<Self>, Box<Self>),
     Bin(Box<Self>, BinOp, Box<Self>),
+}
+
+fn parse_expr(mut state: State) -> ParserResult<Expr> {
+    todo!()
 }
 
 enum Decl {
