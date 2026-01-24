@@ -3,24 +3,15 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-const KWS: [&str; 14] = [
-    "continue", "switch", "default", "return", "while", "break", "void", "case", "else", "goto",
-    "for", "int", "if", "do",
-];
-const OPS: [&str; 33] = [
-    "<<=", ">>=", r"\+=", "-=", "/=", r"\*=", "%=", "&=", r"\|=", r"\^=", "<=", ">=", "--",
-    r"\+\+", "<<", ">>", "&&", r"\|\|", "==", "!=", "-", "~", r"\+", r"\*", "/", "%", "&", r"\|",
-    r"\^", "!", ">", "<", "=",
-];
-const DELIMS: [&str; 8] = [",", ";", ":", r"\?", r"\(", r"\)", r"\{", r"\}"];
+#[rustfmt::skip]
+const KWS: &str = r"\b(?:continue|switch|default|return|while|break|void|case|else|goto|for|int|if|do)\b";
+const OPS: &str = r"(?:<<=|>>=|\+=|-=|/=|\*=|%=|&=|\|=|\^=|<=|>=|--|\+\+|<<|>>|&&|\|\||==|!=|-|~|\+|\*|/|%|&|\||\^|!|>|<|=)";
+const DELIMS: &str = r"(?:,|;|:|\?|\(|\)|\{|\})";
+const IDENTS: &str = r"(?:[a-zA-Z_]\w*)\b";
+const CONSTS: &str = r"(?:[0-9]+)\b";
 
 static RE: LazyLock<Regex> = LazyLock::new(|| {
-    let idents = r"(?:[a-zA-Z_]\w*)\b";
-    let contants = r"(?:[0-9]+)\b";
-    let ops = OPS.join("|");
-    let delims = DELIMS.join("|");
-    let keywords = format!(r"(?:{})\b", KWS.join("|"));
-    let pattern = format!("^(?:{keywords}|{idents}|{contants}|{ops}|{delims})");
+    let pattern = format!("^(?:{KWS}|{IDENTS}|{CONSTS}|{OPS}|{DELIMS})");
     Regex::new(&pattern).unwrap()
 });
 
@@ -222,7 +213,7 @@ pub fn tokenize<T: AsRef<str>>(input: T) -> Result<Vec<Token>, String> {
 
     let candidates = word_boundry_re
         .split(input.as_ref())
-        .filter(|m| !m.is_empty())
+        .filter(|m| !m.trim().is_empty())
         .map(|m| m.trim());
 
     for candidate in candidates {
