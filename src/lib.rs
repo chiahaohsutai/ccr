@@ -1,15 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::{fs, process};
 
 use tempfile::{Builder, NamedTempFile};
 
 mod compiler;
-
 pub use compiler::Stage as CompilerStage;
-
-pub mod codegen;
-pub mod parser;
-pub mod tacky;
 
 fn preprocess(input: &Path) -> Result<NamedTempFile, String> {
     let inter = Builder::new()
