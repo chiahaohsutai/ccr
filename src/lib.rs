@@ -3,10 +3,12 @@ use std::{fs, process};
 
 use tempfile::{Builder, NamedTempFile};
 
-use crate::compiler::Target;
-
-pub mod cli;
+mod cli;
 mod compiler;
+
+pub fn get_args() -> cli::Args {
+    cli::get_matches()
+}
 
 fn preprocess(input: &Path) -> Result<NamedTempFile, String> {
     let inter = Builder::new()

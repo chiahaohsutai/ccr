@@ -4,7 +4,7 @@ use std::str::FromStr;
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
-use nora::{build, cli};
+use nora::{build, get_args};
 
 fn init_loggging(level: Level) -> Result<(), String> {
     let subscriber = FmtSubscriber::builder().with_max_level(level).finish();
@@ -15,7 +15,7 @@ fn init_loggging(level: Level) -> Result<(), String> {
 fn main() -> Result<(), String> {
     init_loggging(Level::DEBUG)?;
 
-    let args = cli::get_matches();
+    let args = get_args();
     let path: &Path = args.as_ref();
 
     if path.exists() && path.is_file() {

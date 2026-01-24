@@ -4,7 +4,7 @@ use clap::{ArgGroup, ArgMatches, Command, Id, arg};
 
 use super::compiler;
 
-struct Args {
+pub struct Args {
     pub path: String,
     pub target: compiler::Target,
     pub stop_after: Option<compiler::Stage>,
