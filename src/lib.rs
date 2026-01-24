@@ -3,12 +3,13 @@ use std::{fs, process};
 
 use tempfile::{Builder, NamedTempFile};
 
-pub mod compiler;
+mod compiler;
+
+pub use compiler::Stage as CompilerStage;
 
 pub mod codegen;
 pub mod parser;
 pub mod tacky;
-pub mod tokenizer;
 
 fn preprocess(input: &Path) -> Result<NamedTempFile, String> {
     let inter = Builder::new()
