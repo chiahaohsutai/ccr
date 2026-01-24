@@ -3,9 +3,25 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
+const KWS: [&str; 14] = [
+    "continue", "switch", "default", "return", "while", "break", "void", "case", "else", "goto",
+    "for", "int", "if", "do",
+];
+const OPS: [&str; 33] = [
+    "<<=", ">>=", r"\+=", "-=", "/=", r"\*=", "%=", "&=", r"\|=", r"\^=", "<=", ">=", "--",
+    r"\+\+", "<<", ">>", "&&", r"\|\|", "==", "!=", "-", "~", r"\+", r"\*", "/", "%", "&", r"\|",
+    r"\^", "!", ">", "<", "=",
+];
+const DELIMS: [&str; 8] = [",", ";", ":", r"\?", r"\(", r"\)", r"\{", r"\}"];
+
 static RE: LazyLock<Regex> = LazyLock::new(|| {
-    let pattern = r"^(?:(?:continue|switch|default|return|while|break|void|case|else|goto|for|int|if|do)\b|(?:[a-zA-Z_]\w*)\b|(?:[0-9]+)\b|<<=|>>=|\+=|-=|\/=|\*=|%=|&=|\|=|\^=|<=|>=|--|\+\+|<<|>>|&&|\|\||==|!=|[,;:\?\(\)\{\}\-~\+\*\/%&\|\^!><=])";
-    Regex::new(pattern).unwrap()
+    let idents = r"(?:[a-zA-Z_]\w*)\b";
+    let contants = r"(?:[0-9]+)\b";
+    let ops = OPS.join("|");
+    let delims = DELIMS.join("|");
+    let keywords = format!(r"(?:{})\b", KWS.join("|"));
+    let pattern = format!("^(?:{keywords}|{idents}|{contants}|{ops}|{delims})");
+    Regex::new(&pattern).unwrap()
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -200,29 +216,20 @@ impl fmt::Display for Token {
     }
 }
 
-fn is_whitespace<T: AsRef<str>>(s: T) -> bool {
-    s.as_ref().chars().all(|c| c.is_whitespace())
-}
-
 pub fn tokenize<T: AsRef<str>>(input: T) -> Result<Vec<Token>, String> {
-    let input = input.as_ref();
-
-    let mut i = 0;
+    let word_boundry_re = Regex::new(r"\b").unwrap();
     let mut tokens = vec![];
 
-    while i < input.len() {
-        while i < input.len() && is_whitespace(&input[i..i + 1]) {
-            i += 1
-        }
-        if i < input.len() {
-            RE.find(&input[i..])
-                .map(|m| {
-                    let token = Token::from(m.as_str());
-                    tokens.push(token);
-                    i += m.as_str().len()
-                })
-                .ok_or(format!("Unrecognized token starting here at index {i}"))?;
-        }
+    let candidates = word_boundry_re
+        .split(input.as_ref())
+        .filter(|m| !m.is_empty())
+        .map(|m| m.trim());
+
+    for candidate in candidates {
+        let m = RE
+            .find(candidate)
+            .ok_or(format!("Invalid token at: {candidate}"))?;
+        tokens.push(Token::from(m.as_str()));
     }
     Ok(tokens)
 }
