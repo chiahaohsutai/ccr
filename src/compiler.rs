@@ -1,13 +1,18 @@
-use std::str::FromStr;
-
 use nanoid::nanoid;
 use nanoid_dictionary::ALPHANUMERIC;
+use std::str::FromStr;
 
 mod parser;
 mod tokenizer;
 
 fn generate_tag<T: AsRef<str>>(prefix: T) -> String {
     format!("{}.{}", prefix.as_ref(), nanoid!(21, ALPHANUMERIC))
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Target {
+    Execuable,
+    ObjFile,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
