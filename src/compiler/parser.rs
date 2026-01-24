@@ -111,20 +111,21 @@ fn parse_factor(mut state: State) -> ParserResult<Factor> {
     let next_is_incr_decr = next.is_some_and(|t| matches!(t, Token::PlusPlus | Token::MinusMinus));
 
     let (factor, state) = match token {
-        Token::Ident(ident) if next_is_incr_decr => {
-            let factor = Box::new(Factor::Ident(ident));
-            match state.tokens.pop_front().unwrap() {
-                Token::PlusPlus => (Factor::PosUnary(UnaryOp::Incr, factor), state),
-                _ => (Factor::PosUnary(UnaryOp::Decr, factor), state),
-            }
-        }
-        Token::Ident(ident) => (Factor::Ident(ident), state),
-        Token::Const(constant) => (Factor::Int(constant), state),
         Token::MinusMinus => parse_prefix_unary_factor(UnaryOp::Decr, state)?,
         Token::PlusPlus => parse_prefix_unary_factor(UnaryOp::Incr, state)?,
         Token::Minus => parse_prefix_unary_factor(UnaryOp::Neg, state)?,
         Token::Bang => parse_prefix_unary_factor(UnaryOp::Not, state)?,
         Token::Tilde => parse_prefix_unary_factor(UnaryOp::Compl, state)?,
+        Token::Const(constant) => (Factor::Int(constant), state),
+        Token::Ident(ident) if !next_is_incr_decr => (Factor::Ident(ident), state),
+        Token::Ident(ident) => {
+            let factor = Box::new(Factor::Ident(ident));
+            if matches!(state.tokens.pop_front().unwrap(), Token::PlusPlus) {
+                (Factor::PosUnary(UnaryOp::Incr, factor), state)
+            } else {
+                (Factor::PosUnary(UnaryOp::Decr, factor), state)
+            }
+        }
         Token::LParen => {
             let (expr, state) = then_expect(state, parse_expr, Token::RParen)?;
             (Factor::Expr(Box::new(expr)), state)
