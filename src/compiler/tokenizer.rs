@@ -209,18 +209,10 @@ impl fmt::Display for Token {
 
 pub fn tokenize<T: AsRef<str>>(input: T) -> Result<Vec<Token>, String> {
     let word_boundry_re = Regex::new(r"\b").unwrap();
-    let mut tokens = vec![];
-
-    let candidates = word_boundry_re
+    word_boundry_re
         .split(input.as_ref())
         .filter(|m| !m.trim().is_empty())
-        .map(|m| m.trim());
-
-    for candidate in candidates {
-        let m = RE
-            .find(candidate)
-            .ok_or(format!("Invalid token at: {candidate}"))?;
-        tokens.push(Token::from(m.as_str()));
-    }
-    Ok(tokens)
+        .map(|m| RE.find(m.trim()).ok_or(format!("Invalid token: {m}")))
+        .map(|m| m.map(|m| Token::from(m.as_str())))
+        .collect::<Result<Vec<Token>, String>>()
 }
