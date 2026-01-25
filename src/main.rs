@@ -14,13 +14,5 @@ fn init_loggging(level: Level) -> Result<(), String> {
 
 fn main() -> Result<(), String> {
     init_loggging(Level::DEBUG)?;
-
-    let args = get_args();
-    let path: &Path = args.as_ref();
-
-    if path.exists() && path.is_file() {
-        build(path, args.target, args.stop_after)
-    } else {
-        Err(format!("Invalid path: {}", path.display()))
-    }
+    build(get_args())
 }

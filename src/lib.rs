@@ -50,13 +50,11 @@ fn link(input: &Path, output: &Path) -> Result<(), String> {
     }
 }
 
-pub fn build(
-    input: &Path,
-    target: compiler::Target,
-    stop_after: Option<compiler::Stage>,
-) -> Result<(), String> {
-    let contents = fs::read_to_string(preprocess(input)?.path()).map_err(|e| e.to_string())?;
-    let instructions = compiler::assemble(contents, stop_after)?;
+pub fn build(args: cli::Args) -> Result<(), String> {
+    let path = Path::new(&args.path);
+    let contents = fs::read_to_string(preprocess(path)?.path()).map_err(|e| e.to_string())?;
+
+    let instructions = compiler::assemble(contents, args.stop_after)?;
 
     if let Some(instructions) = instructions {
         let s = Builder::new()
@@ -66,11 +64,11 @@ pub fn build(
 
         fs::write(s.path(), instructions).map_err(|e| e.to_string())?;
 
-        if let compiler::Target::ObjFile = target {
-            let output = Path::new(input.file_stem().unwrap()).with_extension("o");
+        if let compiler::Target::ObjFile = args.target {
+            let output = Path::new(path.file_stem().unwrap()).with_extension("o");
             compile(s.path(), &output)
         } else {
-            let output = Path::new(input.file_stem().unwrap());
+            let output = Path::new(path.file_stem().unwrap());
             link(s.path(), &output)
         }
     } else {

@@ -11,18 +11,9 @@ pub struct Args {
 }
 
 impl Args {
+    #[rustfmt::skip]
     fn new(path: String, target: compiler::Target, stop_after: Option<compiler::Stage>) -> Self {
-        Self {
-            path,
-            target,
-            stop_after,
-        }
-    }
-}
-
-impl AsRef<Path> for Args {
-    fn as_ref(&self) -> &Path {
-        Path::new(&self.path)
+        Self { path, target, stop_after }
     }
 }
 
