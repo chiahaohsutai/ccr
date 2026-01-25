@@ -13,10 +13,10 @@ enum UnaryOp {
     Compl,
 }
 
-impl TryFrom<Token> for UnaryOp {
+impl TryFrom<&Token> for UnaryOp {
     type Error = String;
 
-    fn try_from(value: Token) -> Result<Self, Self::Error> {
+    fn try_from(value: &Token) -> Result<Self, Self::Error> {
         match value {
             Token::MinusMinus => Ok(Self::Decr),
             Token::PlusPlus => Ok(Self::Incr),
@@ -110,7 +110,7 @@ fn consume_ident(mut state: State) -> FactorResult {
     match state.tokens.pop_front() {
         Some(Token::Ident(ident)) => match state.tokens.front() {
             Some(Token::MinusMinus | Token::PlusPlus) => {
-                let op = UnaryOp::try_from(state.tokens.pop_front().unwrap())?;
+                let op = UnaryOp::try_from(&state.tokens.pop_front().unwrap())?;
                 let factor = Factor::Ident(ident);
                 Ok((Unary::new(op, Fixity::Postfix, factor).into(), state))
             }
@@ -127,7 +127,7 @@ fn consume_unary(mut state: State) -> FactorResult {
         .tokens
         .pop_front()
         .ok_or(String::from("Unexpected end of input: expected factor"))?;
-    let op = UnaryOp::try_from(token)?;
+    let op = UnaryOp::try_from(&token)?;
     Ok(parse(state)?.map_first(|f| Unary::new(op, Fixity::Prefix, f).into()))
 }
 
