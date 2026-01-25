@@ -62,13 +62,14 @@ arch -x86_64 zsh
 cargo run -- path/to/my_program.c
 ```
 
-### Testing
+## Testing
 
-The [writing-a-c-compiler-tests](https://github.com/nlsandler/writing-a-c-compiler-tests/) suite is included as a submodule. To run the tests, ensure the submodule is initialized and follow the instructions in the `tests/README.md`.
-
-Because this project implements all **extra-credit features**, you can enable the extra-credit flag when running the test suite to verify the full functionality of the compiler.
+The [writing-a-c-compiler-tests](https://github.com/nlsandler/writing-a-c-compiler-tests/) suite is included as a submodule in the `tests/` directory and is configured to track the `main` branch. Because this project implements all **extra-credit features**, you should use the `--extra-credit` flag to verify the compiler's full functionality.
 
 ```bash
+# 1. Initialize and pull the latest test cases
+git submodule update --init --remote --merge
+
+# 2. Run the test suite against the compiled binary
 cd tests
 ./test_compiler ../target/debug/nora --extra-credit
-```
