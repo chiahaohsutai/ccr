@@ -48,21 +48,27 @@ To build and run this project, ensure the following command-line tools are insta
 * A system C compiler (`gcc` or `clang`, accessible as `gcc`)
 
 ```bash
-# Build the project
+# 1. Clone the repo and its submodules
+git clone --recurse-submodules https://github.com/path/to/repository
+cd repository-name
+
+# 2. Build the project
 cargo build
 
-# If on Apple Silicon Mac, run the shell in Intel (x86_64) mode:
+# 3. (Apple Silicon Mac ONLY) If you hit architecture errors, switch to Intel mode:
 arch -x86_64 zsh
 
-# Run the compiler
+# 4. Run the compiler on your source file
 cargo run -- path/to/my_program.c
 ```
 
 ### Testing
 
-To run the tests, clone the [writing-a-c-compiler-tests](https://github.com/nlsandler/writing-a-c-compiler-tests/) repository and follow the instructions in its README. The repository provides setup steps and detailed guidance for running the test suite against this compiler. This project implements all extra-credit features, so the extra-credit flag can be enabled when running the tests.
+The [writing-a-c-compiler-tests](https://github.com/nlsandler/writing-a-c-compiler-tests/) suite is included as a submodule. To run the tests, ensure the submodule is initialized and follow the instructions in the `tests/README.md`.
+
+Because this project implements all **extra-credit features**, you can enable the extra-credit flag when running the test suite to verify the full functionality of the compiler.
 
 ```bash
-# Run the full test suite, including all extra-credit features
-./test_compiler path/to/compiler --extra-credit
+cd tests
+./test_compiler ../target/debug/nora --extra-credit
 ```
