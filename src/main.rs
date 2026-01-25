@@ -1,6 +1,3 @@
-use std::path::Path;
-use std::str::FromStr;
-
 use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 

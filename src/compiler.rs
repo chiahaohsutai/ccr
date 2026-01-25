@@ -47,5 +47,9 @@ pub fn assemble<T: AsRef<str>>(
     if matches!(stop_after, Some(Stage::Lex)) {
         return Ok(None);
     }
+    let ast = parser::parse(tokens)?;
+    if matches!(stop_after, Some(Stage::Parse)) {
+        return Ok(None);
+    }
     todo!()
 }
