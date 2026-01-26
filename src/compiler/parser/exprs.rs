@@ -122,8 +122,15 @@ struct Ternary {
 
 struct BinExpr {
     lhs: Box<Expr>,
-    op: Box<BinOp>,
+    op: BinOp,
     rhs: Box<Expr>,
+}
+
+impl BinExpr {
+    #[rustfmt::skip]
+    fn new(lhs: Box<Expr>, op: BinOp, rhs: Box<Expr>) -> Self {
+        Self { lhs, op, rhs }
+    }
 }
 
 pub enum Expr {
@@ -180,6 +187,14 @@ impl TryFrom<&Token> for Op {
     }
 }
 
+fn consume_token(mut state: State) -> ParserResult<Token> {
+    let token = state
+        .tokens
+        .pop_front()
+        .ok_or(String::from("Unexpected end of input: expected expression"))?;
+    Ok((token, state))
+}
+
 fn consume_assignment(state: State, operand: Expr, precedence: u64) -> ExprResult {
     todo!()
 }
@@ -188,25 +203,27 @@ fn consume_ternary(state: State, operand: Expr, precedence: u64) -> ExprResult {
     todo!()
 }
 
-fn consume_expr(state: State, operand: Expr, precedence: u64) -> ExprResult {
-    todo!()
-}
+fn consume_expr(mut state: State, operand: Expr) -> ExprResult {
+    let (token, state) = consume_token(state)?;
 
-fn next(state: &State) -> Option<Op> {
-    state.tokens.front().map(|t| Op::try_from(t).ok()).flatten()
+    let op = BinOp::try_from(&token)?;
+    let (expr, state) = consume_and_climb(state, op.precedence() + 1)?;
+
+    let operand = Expr::Bin(BinExpr::new(Box::new(operand), op, Box::new(expr)));
+    Ok((operand, state))
 }
 
 fn consume_and_climb(state: State, precedence: u64) -> ExprResult {
     let (mut lhs, mut state) = factors::parse(state)?.map_first(Expr::from);
-    let mut op = next(&state);
+    let mut op = state.tokens.front().map(|t| Op::try_from(t).ok()).flatten();
 
     while op.as_ref().is_some_and(|op| op.precedence() >= precedence) {
         (lhs, state) = match op.as_ref().unwrap() {
             Op::Ternary => consume_ternary(state, lhs, precedence)?,
             Op::BinOp(op) if is_assignment(&op) => consume_assignment(state, lhs, precedence)?,
-            Op::BinOp(_) => consume_expr(state, lhs, precedence)?,
+            Op::BinOp(_) => consume_expr(state, lhs)?,
         };
-        op = next(&state)
+        op = state.tokens.front().map(|t| Op::try_from(t).ok()).flatten()
     }
     Ok((lhs.into(), state))
 }
