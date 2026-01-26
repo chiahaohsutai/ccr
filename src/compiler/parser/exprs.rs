@@ -206,7 +206,10 @@ fn consume_token(mut state: State) -> ParserResult<Token> {
 }
 
 fn consume_assignment(state: State, operand: Expr, precedence: u64) -> ExprResult {
-    todo!()
+    let (token, state) = consume_token(state)?;
+    let op = BinOp::try_from(&token)?;
+    let (expr, state) = consume_and_climb(state, op.precedence())?;
+    Ok((Expr::Bin(BinExpr::new(operand, op, expr)), state))
 }
 
 fn consume_ternary(state: State, operand: Expr, precedence: u64) -> ExprResult {
