@@ -120,6 +120,16 @@ struct Ternary {
     otherwise: Box<Expr>,
 }
 
+impl Ternary {
+    fn new(cond: Expr, then: Expr, otherwise: Expr) -> Self {
+        Self {
+            cond: Box::new(cond),
+            then: Box::new(then),
+            otherwise: Box::new(otherwise),
+        }
+    }
+}
+
 struct BinExpr {
     lhs: Box<Expr>,
     op: BinOp,
@@ -128,8 +138,8 @@ struct BinExpr {
 
 impl BinExpr {
     #[rustfmt::skip]
-    fn new(lhs: Box<Expr>, op: BinOp, rhs: Box<Expr>) -> Self {
-        Self { lhs, op, rhs }
+    fn new(lhs: Expr, op: BinOp, rhs: Expr) -> Self {
+        Self { lhs: Box::new(lhs), op, rhs: Box::new(rhs) }
     }
 }
 
@@ -200,17 +210,24 @@ fn consume_assignment(state: State, operand: Expr, precedence: u64) -> ExprResul
 }
 
 fn consume_ternary(state: State, operand: Expr, precedence: u64) -> ExprResult {
-    todo!()
+    let (token, state) = consume_token(state)?;
+    if matches!(token, Token::Eroteme) {
+        let (then, mut state) = consume_and_climb(state, 0)?;
+        let (otherwise, state) = match state.tokens.pop_front() {
+            Some(Token::Colon) => consume_and_climb(state, 0)?,
+            _ => return Err(format!("Expected `:` found: {token}")),
+        };
+        Ok((Expr::Tern(Ternary::new(operand, then, otherwise)), state))
+    } else {
+        Err(format!("Expected `?` found: {token}"))
+    }
 }
 
 fn consume_expr(mut state: State, operand: Expr) -> ExprResult {
     let (token, state) = consume_token(state)?;
-
     let op = BinOp::try_from(&token)?;
     let (expr, state) = consume_and_climb(state, op.precedence() + 1)?;
-
-    let operand = Expr::Bin(BinExpr::new(Box::new(operand), op, Box::new(expr)));
-    Ok((operand, state))
+    Ok((Expr::Bin(BinExpr::new(operand, op, expr)), state))
 }
 
 fn consume_and_climb(state: State, precedence: u64) -> ExprResult {
