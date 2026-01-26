@@ -31,7 +31,7 @@ fn consume_and_expect<T>(state: State, consumer: Parser<T>, expect: Token) -> Pa
     let (node, mut state) = consumer(state)?;
     match state.tokens.pop_front() {
         Some(token) if token.eq(&expect) => Ok((node, state)),
-        Some(token) => Err(format!("Expected '{expect}' found '{token}'")),
+        Some(token) => Err(format!("Expected `{expect}` found `{token}`")),
         None => Err(format!("Unexpected end of input: expected {expect}")),
     }
 }

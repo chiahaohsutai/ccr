@@ -142,7 +142,7 @@ fn consume_const(mut state: State) -> FactorResult {
 fn consume_expr(mut state: State) -> FactorResult {
     match state.tokens.pop_front() {
         Some(Token::LParen) => Ok(exprs::parse(state)?.map_first(|e| e.into())),
-        Some(token) => Err(format!("Expected '(' found: {token}")),
+        Some(token) => Err(format!("Expected `(` found: {token}")),
         None => Err(String::from("Unexpected end of input: expected factor")),
     }
 }

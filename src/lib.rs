@@ -14,7 +14,7 @@ fn preprocess(input: &Path) -> Result<NamedTempFile, String> {
     let inter = Builder::new()
         .suffix(".i")
         .tempfile()
-        .map_err(|e| format!("Failed to '.i' file: {e}"))?;
+        .map_err(|e| format!("Failed to `.i` file: {e}"))?;
 
     let mut cmd = process::Command::new("gcc");
     let cmd = cmd
@@ -60,7 +60,7 @@ pub fn build(args: cli::Args) -> Result<(), String> {
         let s = Builder::new()
             .suffix(".s")
             .tempfile()
-            .map_err(|e| format!("Failed to create '.s' file: {e}"))?;
+            .map_err(|e| format!("Failed to create `.s` file: {e}"))?;
 
         fs::write(s.path(), instructions).map_err(|e| e.to_string())?;
 
