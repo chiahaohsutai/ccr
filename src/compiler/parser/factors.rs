@@ -1,7 +1,7 @@
 use std::fmt;
 
 use super::super::tokenizer::Token;
-use super::{ParserResult, State, TupleExt, consume_and_expect, exprs};
+use super::{ParserResult, State, TupleExt, exprs};
 
 type FactorResult = ParserResult<Factor>;
 
@@ -114,7 +114,7 @@ fn consume_ident(mut state: State) -> FactorResult {
                 let factor = Factor::Ident(ident);
                 Ok((Unary::new(op, Fixity::Postfix, factor).into(), state))
             }
-            Some(Token::LParen) => consume_and_expect(state, consume_args, Token::RParen),
+            Some(Token::LParen) => consume_args(state),
             _ => Ok((Factor::Ident(ident), state)),
         },
         Some(token) => Err(format!("Expected identifier found: {token}")),
