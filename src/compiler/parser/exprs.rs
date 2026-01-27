@@ -1,5 +1,5 @@
 use super::super::tokenizer::Token;
-use super::{ParserResult, State, TupleExt, consume_and_expect, factors};
+use super::{ParserResult, State, TupleExt, factors};
 
 type ExprResult = ParserResult<Expr>;
 
@@ -197,7 +197,7 @@ impl TryFrom<&Token> for Op {
     }
 }
 
-fn consume_token(mut state: State) -> ParserResult<Token> {
+fn consume_token(mut state: State) -> Result<(Token, State), String> {
     let token = state
         .tokens
         .pop_front()
@@ -205,14 +205,14 @@ fn consume_token(mut state: State) -> ParserResult<Token> {
     Ok((token, state))
 }
 
-fn consume_assignment(state: State, operand: Expr, precedence: u64) -> ExprResult {
+fn consume_assignment(state: State, operand: Expr) -> ExprResult {
     let (token, state) = consume_token(state)?;
     let op = BinOp::try_from(&token)?;
     let (expr, state) = consume_and_climb(state, op.precedence())?;
     Ok((Expr::Bin(BinExpr::new(operand, op, expr)), state))
 }
 
-fn consume_ternary(state: State, operand: Expr, precedence: u64) -> ExprResult {
+fn consume_ternary(state: State, operand: Expr) -> ExprResult {
     let (token, state) = consume_token(state)?;
     if matches!(token, Token::Eroteme) {
         let (then, mut state) = consume_and_climb(state, 0)?;
@@ -239,8 +239,8 @@ fn consume_and_climb(state: State, precedence: u64) -> ExprResult {
 
     while op.as_ref().is_some_and(|op| op.precedence() >= precedence) {
         (lhs, state) = match op.as_ref().unwrap() {
-            Op::Ternary => consume_ternary(state, lhs, precedence)?,
-            Op::BinOp(op) if is_assignment(&op) => consume_assignment(state, lhs, precedence)?,
+            Op::Ternary => consume_ternary(state, lhs)?,
+            Op::BinOp(op) if is_assignment(&op) => consume_assignment(state, lhs)?,
             Op::BinOp(_) => consume_expr(state, lhs)?,
         };
         op = state.tokens.front().map(|t| Op::try_from(t).ok()).flatten()

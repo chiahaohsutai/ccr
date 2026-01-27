@@ -39,15 +39,14 @@ impl FromStr for Stage {
     }
 }
 
-pub fn assemble<T: AsRef<str>>(
-    input: T,
-    stop_after: Option<Stage>,
-) -> Result<Option<String>, String> {
+type AssemblyResult = Result<Option<String>, String>;
+
+pub fn assemble<T: AsRef<str>>(input: T, stop_after: Option<Stage>) -> AssemblyResult {
     let tokens = tokenizer::tokenize(input)?;
     if matches!(stop_after, Some(Stage::Lex)) {
         return Ok(None);
     }
-    let ast = parser::parse(tokens)?;
+    let _ = parser::parse(tokens)?;
     if matches!(stop_after, Some(Stage::Parse)) {
         return Ok(None);
     }

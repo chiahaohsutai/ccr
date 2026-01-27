@@ -1,8 +1,23 @@
-use super::{blocks, decls, exprs};
+use super::super::tokenizer::Token;
+use super::{ParserResult, State, blocks, decls, exprs};
+
+type StmtResult = ParserResult<Stmt>;
 
 enum ForInit {
     Decl(decls::Decl),
     Expr(Option<exprs::Expr>),
+}
+
+impl From<decls::Decl> for ForInit {
+    fn from(value: decls::Decl) -> Self {
+        Self::Decl(value)
+    }
+}
+
+impl From<exprs::Expr> for ForInit {
+    fn from(value: exprs::Expr) -> Self {
+        Self::Expr(Some(value))
+    }
 }
 
 struct If {
@@ -69,4 +84,20 @@ pub enum Stmt {
     Case(Clause),
     Default(Default),
     For(For),
+}
+
+fn consume_null(mut state: State) -> StmtResult {
+    match state.tokens.pop_front() {
+        Some(Token::Semicolon) => Ok((Stmt::Null, state)),
+        Some(token) => Err(format!("Expected `;` found: {token}")),
+        None => Err(String::from("Unexpected end of input: expected stmt")),
+    }
+}
+
+pub fn parse(state: State) -> StmtResult {
+    let token = state.tokens.front();
+    match token.ok_or("Unexpected end of input: expected stmt")? {
+        Token::Semicolon => consume_null(state),
+        _ => todo!(),
+    }
 }
