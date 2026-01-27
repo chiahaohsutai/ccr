@@ -94,10 +94,26 @@ fn consume_null(mut state: State) -> StmtResult {
     }
 }
 
+fn consume_return(mut state: State) -> StmtResult {
+    match state.tokens.pop_front() {
+        Some(Token::Return) => {
+            let (expr, mut state) = exprs::parse(state)?;
+            match state.tokens.pop_front() {
+                Some(Token::Semicolon) => Ok((Stmt::Return(expr), state)),
+                Some(token) => return Err(format!("Expected `;` found: {token}")),
+                None => return Err(String::from("Unexpected end of input: expected `;`")),
+            }
+        }
+        Some(token) => Err(format!("Expected `return` found: {token}")),
+        None => Err(String::from("Unexpected end of input: expected stmt")),
+    }
+}
+
 pub fn parse(state: State) -> StmtResult {
     let token = state.tokens.front();
     match token.ok_or("Unexpected end of input: expected stmt")? {
         Token::Semicolon => consume_null(state),
+        Token::Return => consume_return(state),
         _ => todo!(),
     }
 }
