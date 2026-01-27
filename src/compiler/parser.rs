@@ -10,7 +10,6 @@ mod factors;
 mod stmts;
 
 type ParserResult<T> = Result<(T, State), String>;
-type Parser<T> = fn(State) -> ParserResult<T>;
 
 trait TupleExt<T, U> {
     fn map_first<K, F>(self, f: F) -> (K, U)
@@ -24,15 +23,6 @@ impl<T, U> TupleExt<T, U> for (T, U) {
         F: FnOnce(T) -> K,
     {
         (f(self.0), self.1)
-    }
-}
-
-fn consume_and_expect<T>(state: State, consumer: Parser<T>, expect: Token) -> ParserResult<T> {
-    let (node, mut state) = consumer(state)?;
-    match state.tokens.pop_front() {
-        Some(token) if token.eq(&expect) => Ok((node, state)),
-        Some(token) => Err(format!("Expected `{expect}` found `{token}`")),
-        None => Err(format!("Unexpected end of input: expected {expect}")),
     }
 }
 
