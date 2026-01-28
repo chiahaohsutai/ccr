@@ -31,10 +31,28 @@ enum Scope {
     Switch(String),
 }
 
+impl AsRef<str> for Scope {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Loop(label) => label,
+            Self::Switch(label) => label,
+        }
+    }
+}
+
 struct State {
     tokens: VecDeque<Token>,
     scopes: VecDeque<Scope>,
     labels: HashSet<String>,
+}
+
+impl State {
+    pub fn current_loop(&self) -> Option<&Scope> {
+        self.scopes
+            .iter()
+            .rev()
+            .find(|scope| matches!(scope, Scope::Loop(_)))
+    }
 }
 
 fn generate_label() -> String {

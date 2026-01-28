@@ -76,8 +76,8 @@ pub enum Stmt {
     Goto(String),
     Label(Label),
     Comp(blocks::Block),
-    Break(String),
-    Continue(String),
+    Break(Option<String>),
+    Continue(Option<String>),
     While(While),
     DoWhile(While),
     Switch(Switch),
@@ -109,11 +109,29 @@ fn consume_return(mut state: State) -> StmtResult {
     }
 }
 
+fn consume_continue(mut state: State) -> StmtResult {
+    match state.tokens.pop_front() {
+        Some(Token::Continue) => {
+            let label = state
+                .current_loop()
+                .map(|scope| String::from(scope.as_ref()));
+            match state.tokens.pop_front() {
+                Some(Token::Semicolon) => Ok((Stmt::Continue(label), state)),
+                Some(token) => return Err(format!("Expected `;` found: {token}")),
+                None => return Err(String::from("Unexpected end of input: expected `;`")),
+            }
+        }
+        Some(token) => Err(format!("Expected `continue` found: {token}")),
+        None => Err(String::from("Unexpected end of input: expected stmt")),
+    }
+}
+
 pub fn parse(state: State) -> StmtResult {
     let token = state.tokens.front();
     match token.ok_or("Unexpected end of input: expected stmt")? {
         Token::Semicolon => consume_null(state),
         Token::Return => consume_return(state),
+        Token::Continue => consume_continue(state),
         _ => todo!(),
     }
 }
