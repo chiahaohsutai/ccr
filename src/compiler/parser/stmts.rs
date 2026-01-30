@@ -116,6 +116,18 @@ fn consume_return(mut state: State) -> StmtResult {
     }
 }
 
+fn consume_break(mut state: State) -> StmtResult {
+    match state.tokens.pop_front() {
+        Some(Token::Break) => match state.tokens.pop_front() {
+            Some(Token::Semicolon) => Ok((Stmt::Break(None), state)),
+            Some(token) => Err(format!("Expected `;` found: {token}")),
+            None => Err(String::from("Unexpected end of input: expected `;`")),
+        },
+        Some(token) => Err(format!("Expected `break` found: {token}")),
+        None => Err(String::from("Unexpected end of input: expected `break`")),
+    }
+}
+
 fn consume_continue(mut state: State) -> StmtResult {
     match state.tokens.pop_front() {
         Some(Token::Continue) => {
@@ -169,7 +181,10 @@ pub fn parse(state: State) -> StmtResult {
     match token.ok_or("Unexpected end of input: expected stmt")? {
         Token::Semicolon => consume_null(state),
         Token::Return => consume_return(state),
+        Token::Break => consume_break(state),
         Token::Continue => consume_continue(state),
+        Token::Goto => consume_goto(state),
+        Token::Ident(_) => consume_label(state),
         _ => todo!(),
     }
 }
