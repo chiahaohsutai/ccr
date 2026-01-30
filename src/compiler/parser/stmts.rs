@@ -31,6 +31,13 @@ struct Label {
     body: Box<Stmt>,
 }
 
+impl Label {
+    #[rustfmt::skip]
+    fn new(name: String, body: Stmt) -> Self {
+        Self { name, body: Box::new(body) }
+    }
+}
+
 struct While {
     id: String,
     cond: exprs::Expr,
@@ -122,6 +129,21 @@ fn consume_continue(mut state: State) -> StmtResult {
             }
         }
         Some(token) => Err(format!("Expected `continue` found: {token}")),
+        None => Err(String::from("Unexpected end of input: expected stmt")),
+    }
+}
+
+fn consume_label(mut state: State) -> StmtResult {
+    match state.tokens.pop_front() {
+        Some(Token::Ident(ident)) => match state.tokens.pop_front() {
+            Some(Token::Colon) => {
+                let (stmt, state) = parse(state)?;
+                Ok((Stmt::Label(Label::new(ident, stmt)), state))
+            }
+            Some(token) => return Err(format!("Expected `:` found: {token}")),
+            None => Err(String::from("Unexpected end of input: expected `:`")),
+        },
+        Some(token) => return Err(format!("Expected identifier found: {token}")),
         None => Err(String::from("Unexpected end of input: expected stmt")),
     }
 }
