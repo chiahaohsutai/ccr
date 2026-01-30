@@ -97,7 +97,7 @@ fn consume_null(mut state: State) -> StmtResult {
     match state.tokens.pop_front() {
         Some(Token::Semicolon) => Ok((Stmt::Null, state)),
         Some(token) => Err(format!("Expected `;` found: {token}")),
-        None => Err(String::from("Unexpected end of input: expected stmt")),
+        None => Err(String::from("Unexpected end of input: expected `;`")),
     }
 }
 
@@ -112,7 +112,7 @@ fn consume_return(mut state: State) -> StmtResult {
             }
         }
         Some(token) => Err(format!("Expected `return` found: {token}")),
-        None => Err(String::from("Unexpected end of input: expected stmt")),
+        None => Err(String::from("Unexpected end of input: expected `return`")),
     }
 }
 
@@ -129,7 +129,7 @@ fn consume_continue(mut state: State) -> StmtResult {
             }
         }
         Some(token) => Err(format!("Expected `continue` found: {token}")),
-        None => Err(String::from("Unexpected end of input: expected stmt")),
+        None => Err(String::from("Unexpected end of input: expected `continue`")),
     }
 }
 
@@ -144,7 +144,23 @@ fn consume_label(mut state: State) -> StmtResult {
             None => Err(String::from("Unexpected end of input: expected `:`")),
         },
         Some(token) => return Err(format!("Expected identifier found: {token}")),
-        None => Err(String::from("Unexpected end of input: expected stmt")),
+        None => Err(String::from("Unexpected end of input: expected `label`")),
+    }
+}
+
+fn consume_goto(mut state: State) -> StmtResult {
+    match state.tokens.pop_front() {
+        Some(Token::Goto) => match state.tokens.pop_front() {
+            Some(Token::Ident(ident)) => match state.tokens.pop_front() {
+                Some(Token::Semicolon) => Ok((Stmt::Goto(ident), state)),
+                Some(token) => return Err(format!("Expected `;` found: {token}")),
+                None => return Err(String::from("Unexpected end of input: expected `;`")),
+            },
+            Some(token) => return Err(format!("Expected identifier found: {token}")),
+            None => return Err(String::from("Unexpected end of input: expected identifier")),
+        },
+        Some(token) => return Err(format!("Expected `goto` found: {token}")),
+        None => return Err(String::from("Unexpected end of input: expected `goto`")),
     }
 }
 
